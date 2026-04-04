@@ -23,6 +23,13 @@ html, body {
   overflow: hidden;
 }
 
+/* ── Mobile ──────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  #screen-lobby { overflow-y: auto; height: auto; min-height: 100vh; padding: 32px 16px; }
+  #input-room { width: 100%; max-width: 320px; }
+  #screen-lobby h1 { font-size: 2rem; }
+}
+
 button {
   cursor: pointer;
   font-family: var(--font);

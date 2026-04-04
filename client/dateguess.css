@@ -440,8 +440,21 @@ input[type="text"]::placeholder { color: var(--text2); }
 /* Responsive */
 @media (max-width: 480px) {
   .year-big { font-size: 2.8rem; }
-  .image-title { font-size: 1.1rem; }
-  .card { padding: 20px; }
+  .image-title { font-size: 1rem; }
+  .card { padding: 16px; }
   .avatar-grid { grid-template-columns: repeat(6, 1fr); }
   .month-btn { padding: 3px 5px; font-size: 0.7rem; }
+  .settings-grid { grid-template-columns: 1fr; }
+  .date-picker-area { padding: 12px 14px 16px; }
+  .year-display-row { gap: 8px; }
+  .submit-row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .btn-submit { width: 100%; }
+  .guess-count { text-align: center; }
+  .score-row { flex-wrap: wrap; }
+  .result-header { padding: 16px; }
+  .score-rows { padding: 8px 12px; }
+  .round-result-card .result-footer { flex-direction: column; gap: 8px; align-items: flex-start; }
+  .podium-list { padding: 12px 14px; }
+  .image-title-bar { padding: 12px 14px 8px; }
+  .timer-num { font-size: 1.1rem; }
 }
