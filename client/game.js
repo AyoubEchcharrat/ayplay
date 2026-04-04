@@ -33,6 +33,8 @@ socket.on('game_state_update', ({ myGameState }) => {
   gs = myGameState;
   screenLobby.classList.add('hidden');
   screenGame.classList.remove('hidden');
+  const hubBtn = document.querySelector('.btn-hub');
+  if (hubBtn) hubBtn.style.display = 'none';
   render();
 });
 
@@ -187,6 +189,7 @@ function buildHandCard(card, idx) {
 
   const typeBadge = card.type === 'terrain' ? 'T'
                   : card.type === 'state'   ? 'É'
+                  : card.type === 'special' ? '★'
                   : '';
 
   let bottomHtml;
@@ -235,15 +238,8 @@ function onHandCardClick(idx) {
     return;
   }
 
-  // Terrain / état → jouer immédiatement
-  if (card.type === 'terrain') {
-    if (gs.me.playedTerrain) return showHint('Terrain déjà joué ce tour', 'error');
-    socket.emit('play_card', { cardIndex: idx });
-    clearSelection();
-    return;
-  }
-  if (card.type === 'state') {
-    if (gs.me.playedState) return showHint('État déjà joué ce tour', 'error');
+  // Terrain / état / spécial → jouer immédiatement
+  if (card.type === 'terrain' || card.type === 'state' || card.type === 'special') {
     socket.emit('play_card', { cardIndex: idx });
     clearSelection();
     return;

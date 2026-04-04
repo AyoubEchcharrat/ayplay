@@ -380,6 +380,10 @@ button:active { transform: scale(.96); }
   border-radius: 3px;
   padding: 1px 3px;
 }
+.hand-card.special { border-color: var(--gold); background: #1a1600; color: var(--gold); }
+.hand-card.special .type-badge { background: var(--gold); color: #111; }
+.hand-card.special .card-name { color: var(--gold); }
+.hand-card.special .card-desc { color: #b8922a; }
 
 /* ── Barre du bas ────────────────────────────────────────────────── */
 #bottom-bar {

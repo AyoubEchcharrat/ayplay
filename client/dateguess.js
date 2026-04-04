@@ -30,6 +30,8 @@ const MONTHS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','N
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  const hubBtn = document.querySelector('.btn-hub');
+  if (hubBtn) hubBtn.style.display = (id === 'screen-lobby') ? '' : 'none';
 }
 
 // ── Lobby setup ────────────────────────────────────────────────
@@ -600,6 +602,17 @@ function launchConfetti() {
 // ── Replay / Lobby ─────────────────────────────────────────────
 document.getElementById('btn-replay').addEventListener('click', () => { socket.emit('dg:replay'); });
 document.getElementById('btn-lobby').addEventListener('click', () => { location.reload(); });
+
+// ── Image zoom ─────────────────────────────────────────────────
+document.getElementById('btn-zoom-image').addEventListener('click', () => {
+  const src = document.getElementById('game-image').src;
+  const modal = document.getElementById('zoom-modal');
+  document.getElementById('zoom-img').src = src;
+  modal.style.display = 'flex';
+});
+document.getElementById('zoom-modal').addEventListener('click', () => {
+  document.getElementById('zoom-modal').style.display = 'none';
+});
 
 // ── Stop game buttons (host) ────────────────────────────────────
 document.getElementById('btn-stop-game').addEventListener('click', () => {

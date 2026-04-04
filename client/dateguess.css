@@ -437,6 +437,16 @@ input[type="text"]::placeholder { color: var(--text2); }
 .dot-anim span:nth-child(3) { animation-delay: 0.4s; }
 @keyframes dotBounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
 
+/* Zoom image button */
+.btn-zoom-image {
+  position: absolute; bottom: 56px; right: 12px; z-index: 10;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
+  color: #fff; border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px; padding: 6px 10px; font-size: 1rem;
+  cursor: pointer; transition: background 0.15s;
+}
+.btn-zoom-image:hover { background: rgba(0,0,0,0.8); }
+
 /* Responsive */
 @media (max-width: 480px) {
   .year-big { font-size: 2.8rem; }

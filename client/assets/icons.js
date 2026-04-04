@@ -331,4 +331,224 @@ const ICONS = {
     <line x1="4"  y1="30" x2="11" y2="30"/>
     <line x1="49" y1="30" x2="56" y2="30"/>
   </svg>`,
+
+  // ── Nouveaux animaux ──────────────────────────────────────────────
+
+  lion: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="30" cy="32" r="16"/>
+    <path d="M30 16 Q18 8 10 14 Q16 20 14 28" stroke-width="2"/>
+    <path d="M30 16 Q42 8 50 14 Q44 20 46 28" stroke-width="2"/>
+    <path d="M30 16 Q24 6 20 10 Q22 16 18 20" stroke-width="1.5"/>
+    <path d="M30 16 Q36 6 40 10 Q38 16 42 20" stroke-width="1.5"/>
+    <path d="M30 16 Q30 4 30 8" stroke-width="1.5"/>
+    <ellipse cx="22" cy="29" rx="4" ry="3.5"/>
+    <ellipse cx="38" cy="29" rx="4" ry="3.5"/>
+    <ellipse cx="22" cy="30" rx="1.8" ry="2" fill="currentColor" stroke="none"/>
+    <ellipse cx="38" cy="30" rx="1.8" ry="2" fill="currentColor" stroke="none"/>
+    <ellipse cx="30" cy="40" rx="7" ry="5"/>
+    <ellipse cx="30" cy="36" rx="3" ry="2" fill="currentColor" stroke="none"/>
+    <line x1="30" y1="38" x2="30" y2="43"/>
+    <path d="M24 43 Q30 47 36 43"/>
+  </svg>`,
+
+  elephant: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="28" cy="24" r="16"/>
+    <circle cx="14" cy="16" r="7"/>
+    <circle cx="42" cy="16" r="7"/>
+    <circle cx="23" cy="20" r="4"/>
+    <circle cx="33" cy="20" r="4"/>
+    <circle cx="23" cy="21" r="1.8" fill="currentColor" stroke="none"/>
+    <circle cx="33" cy="21" r="1.8" fill="currentColor" stroke="none"/>
+    <path d="M28 32 Q22 38 18 46 Q22 50 24 46 Q26 42 28 44 Q30 42 32 46 Q34 50 38 46 Q34 38 28 32"/>
+    <line x1="14" y1="40" x2="10" y2="55"/>
+    <line x1="20" y1="42" x2="18" y2="56"/>
+    <line x1="36" y1="42" x2="38" y2="56"/>
+    <line x1="44" y1="40" x2="48" y2="55"/>
+  </svg>`,
+
+  requin: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 38 Q12 28 24 32 Q36 36 56 32 Q52 42 36 44 Q20 46 4 38 Z"/>
+    <path d="M28 32 L32 10 L36 32"/>
+    <path d="M44 36 L50 28 L54 36"/>
+    <path d="M4 38 Q8 44 16 44 L56 32"/>
+    <ellipse cx="46" cy="38" rx="2" ry="1.5" fill="currentColor" stroke="none"/>
+    <path d="M36 44 Q38 48 42 48 Q46 48 48 44" stroke-width="2"/>
+    <path d="M28 44 Q24 50 20 52 Q16 50 18 46"/>
+  </svg>`,
+
+  gorille: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="30" cy="28" r="18"/>
+    <circle cx="14" cy="18" r="8"/>
+    <circle cx="46" cy="18" r="8"/>
+    <ellipse cx="22" cy="24" rx="5" ry="4"/>
+    <ellipse cx="38" cy="24" rx="5" ry="4"/>
+    <ellipse cx="22" cy="25" rx="2.5" ry="2.5" fill="currentColor" stroke="none"/>
+    <ellipse cx="38" cy="25" rx="2.5" ry="2.5" fill="currentColor" stroke="none"/>
+    <ellipse cx="30" cy="36" rx="12" ry="8"/>
+    <ellipse cx="30" cy="36" rx="8" ry="5" stroke-width="1.5"/>
+    <ellipse cx="30" cy="33" rx="4" ry="3" fill="currentColor" stroke="none"/>
+    <path d="M22 40 Q30 46 38 40"/>
+  </svg>`,
+
+  faucon: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="32" cy="34" rx="12" ry="8" transform="rotate(-20 32 34)"/>
+    <circle cx="20" cy="20" r="10"/>
+    <polygon points="10,22 4,26 12,28"/>
+    <circle cx="17" cy="18" r="2.5" fill="currentColor" stroke="none"/>
+    <circle cx="17.8" cy="17.2" r="1" fill="white" stroke="none"/>
+    <path d="M30 28 Q46 18 56 22 Q48 28 42 32"/>
+    <path d="M38 38 Q50 42 52 50 Q44 50 38 44"/>
+    <path d="M20 30 L16 42 L22 40"/>
+  </svg>`,
+
+  araignee: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="30" cy="30" r="10"/>
+    <circle cx="30" cy="22" r="6"/>
+    <circle cx="28" cy="20" r="2" fill="currentColor" stroke="none"/>
+    <circle cx="32" cy="20" r="2" fill="currentColor" stroke="none"/>
+    <line x1="8"  y1="20" x2="22" y2="28"/>
+    <line x1="4"  y1="30" x2="20" y2="30"/>
+    <line x1="8"  y1="42" x2="22" y2="34"/>
+    <line x1="52" y1="20" x2="38" y2="28"/>
+    <line x1="56" y1="30" x2="40" y2="30"/>
+    <line x1="52" y1="42" x2="38" y2="34"/>
+    <line x1="20" y1="40" x2="16" y2="52"/>
+    <line x1="40" y1="40" x2="44" y2="52"/>
+  </svg>`,
+
+  // ── Nouveaux terrains ─────────────────────────────────────────────
+
+  montagne: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="30,6 4,54 56,54"/>
+    <polygon points="44,22 28,54 60,54"/>
+    <path d="M22,22 Q30,14 38,22" stroke-width="2"/>
+    <path d="M36,32 Q44,26 50,32" stroke-width="1.5"/>
+    <line x1="2" y1="54" x2="58" y2="54"/>
+  </svg>`,
+
+  ocean: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 22 Q12 14 22 22 Q32 30 42 22 Q52 14 58 22"/>
+    <path d="M2 35 Q12 27 22 35 Q32 43 42 35 Q52 27 58 35"/>
+    <path d="M2 48 Q12 40 22 48 Q32 56 42 48 Q52 40 58 48"/>
+    <circle cx="44" cy="10" r="7"/>
+    <line x1="44" y1="1"  x2="44" y2="4"/>
+    <line x1="44" y1="17" x2="44" y2="19"/>
+    <line x1="35" y1="10" x2="33" y2="10"/>
+    <line x1="55" y1="10" x2="53" y2="10"/>
+  </svg>`,
+
+  plaine: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="30" cy="16" r="10"/>
+    <line x1="30" y1="2"  x2="30" y2="5"/>
+    <line x1="30" y1="27" x2="30" y2="30"/>
+    <line x1="16" y1="16" x2="13" y2="16"/>
+    <line x1="44" y1="16" x2="47" y2="16"/>
+    <line x1="20" y1="6"  x2="18" y2="4"/>
+    <line x1="42" y1="26" x2="44" y2="28"/>
+    <line x1="42" y1="6"  x2="44" y2="4"/>
+    <line x1="20" y1="26" x2="18" y2="28"/>
+    <line x1="2"  y1="42" x2="58" y2="42"/>
+    <path d="M2 42 Q10 36 18 42 Q26 48 34 42 Q42 36 50 42 Q54 44 58 42"/>
+    <line x1="2"  y1="54" x2="58" y2="54"/>
+  </svg>`,
+
+  volcan: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="30,10 6,56 54,56"/>
+    <path d="M22,10 Q26,4 30,2 Q34,4 38,10"/>
+    <path d="M24,12 Q28,8 30,6 Q32,8 34,12" stroke-width="1.5"/>
+    <path d="M26,6 Q28,3 30,5 Q29,8 28,7" fill="currentColor" stroke="none"/>
+    <path d="M30,2 Q32,5 34,4 Q32,8 30,6" fill="currentColor" stroke="none"/>
+    <line x1="6"  y1="56" x2="54" y2="56"/>
+  </svg>`,
+
+  // ── Nouveaux états ────────────────────────────────────────────────
+
+  armure: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M30 4 L52 12 L52 32 Q52 50 30 58 Q8 50 8 32 L8 12 Z"/>
+    <path d="M8 20 L52 20"/>
+    <path d="M8 30 L52 30"/>
+    <path d="M18 12 L18 58" stroke-width="1.5"/>
+    <path d="M30 10 L30 58" stroke-width="1.5"/>
+    <path d="M42 12 L42 58" stroke-width="1.5"/>
+  </svg>`,
+
+  'frenésie': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M36 4 L22 28 L32 28 L18 56" stroke-width="3"/>
+    <path d="M26 4 L12 28 L22 28 L8 56" stroke-width="1.5" opacity="0.5"/>
+    <path d="M46 4 L32 28 L42 28 L28 56" stroke-width="1.5" opacity="0.5"/>
+  </svg>`,
+
+  invisibilite: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round"
+    stroke-dasharray="4 3">
+    <circle cx="30" cy="24" r="14"/>
+    <path d="M16 24 Q16 44 30 50 Q44 44 44 24"/>
+    <circle cx="24" cy="20" r="3" stroke-dasharray="none"/>
+    <circle cx="36" cy="20" r="3" stroke-dasharray="none"/>
+    <circle cx="24" cy="21" r="1.5" fill="currentColor" stroke="none"/>
+    <circle cx="36" cy="21" r="1.5" fill="currentColor" stroke="none"/>
+    <path d="M24 30 Q30 35 36 30" stroke-dasharray="none"/>
+  </svg>`,
+
+  // ── Spéciaux ──────────────────────────────────────────────────────
+
+  draw_two: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <rect x="6"  y="14" width="30" height="40" rx="4"/>
+    <rect x="16" y="8"  width="30" height="40" rx="4"/>
+    <line x1="22" y1="22" x2="40" y2="22"/>
+    <line x1="22" y1="30" x2="40" y2="30"/>
+    <line x1="22" y1="38" x2="34" y2="38"/>
+    <path d="M44 2 L44 14" stroke-width="2.5"/>
+    <path d="M40 6 L44 2 L48 6" stroke-width="2.5"/>
+  </svg>`,
+
+  destroy_terrain: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="20" cy="14" r="10"/>
+    <line x1="20" y1="24" x2="36" y2="50"/>
+    <path d="M8 50 L20 56 L52 50"/>
+    <line x1="36" y1="50" x2="52" y2="50"/>
+    <line x1="10" y1="46" x2="20" y2="56"/>
+    <line x1="42" y1="50" x2="38" y2="56"/>
+    <line x1="34" y1="38" x2="46" y2="34"/>
+    <line x1="38" y1="42" x2="48" y2="40"/>
+    <line x1="44" y1="26" x2="52" y2="18"/>
+    <line x1="48" y1="30" x2="56" y2="24"/>
+  </svg>`,
+
+  destroy_state: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"
+    fill="none" stroke="currentColor" stroke-width="2.5"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M30 4 L52 14 L52 32 Q52 50 30 58 Q8 50 8 32 L8 14 Z"/>
+    <line x1="18" y1="20" x2="42" y2="44" stroke-width="4"/>
+    <line x1="42" y1="20" x2="18" y2="44" stroke-width="4"/>
+  </svg>`,
 };

@@ -21,8 +21,6 @@ function initGameState(players) {
         deck,
         hand,
         board: { animals: [], terrain: null, state: null },
-        playedTerrain: false,
-        playedState:   false,
       };
     }),
     log: [],
@@ -85,8 +83,6 @@ function buildClientState(gs, forIdx) {
       hand:         me.hand,
       board:        me.board,
       deckSize:     me.deck.length,
-      playedTerrain: me.playedTerrain,
-      playedState:   me.playedState,
     },
     opponent: {
       hp:        opp.hp,
@@ -109,20 +105,19 @@ function handlePlayCard(gs, playerIdx, cardIndex) {
   const card = player.hand[cardIndex];
 
   if (card.type === 'terrain') {
-    if (player.playedTerrain) return err('Terrain déjà joué ce tour');
+    // Remplacement libre — pas de restriction une fois par tour
+    const prev = player.board.terrain ? ` (remplace ${player.board.terrain.name})` : '';
     player.hand.splice(cardIndex, 1);
-    player.board.terrain  = { ...card };
-    player.playedTerrain  = true;
+    player.board.terrain = { ...card };
     recalcStats(gs);
-    addLog(gs, `J${playerIdx + 1} joue le terrain : ${card.name}`);
+    addLog(gs, `J${playerIdx + 1} joue le terrain : ${card.name}${prev}`);
 
   } else if (card.type === 'state') {
-    if (player.playedState) return err('État déjà joué ce tour');
+    const prev = player.board.state ? ` (remplace ${player.board.state.name})` : '';
     player.hand.splice(cardIndex, 1);
-    player.board.state  = { ...card };
-    player.playedState  = true;
+    player.board.state = { ...card };
     recalcStats(gs);
-    addLog(gs, `J${playerIdx + 1} joue l'état : ${card.name}`);
+    addLog(gs, `J${playerIdx + 1} joue l'état : ${card.name}${prev}`);
 
   } else if (card.type === 'animal') {
     player.hand.splice(cardIndex, 1);
@@ -130,22 +125,49 @@ function handlePlayCard(gs, playerIdx, cardIndex) {
     const animal = {
       ...card,
       instanceId,
-      currentHP:         card.baseDEF,
-      canAttack:         false, // invocation sickness
+      currentHP:           card.baseDEF,
+      canAttack:           false, // fatigue d'invocation
       hasAttackedThisTurn: false,
-      effectiveATK:      card.baseATK,
-      defModifier:       0,
+      effectiveATK:        card.baseATK,
+      defModifier:         0,
     };
     player.board.animals.push(animal);
     recalcStats(gs);
     addLog(gs, `J${playerIdx + 1} invoque ${card.name} (${animal.effectiveATK}⚔ ♥${card.baseDEF})`);
 
+  } else if (card.type === 'special') {
+    player.hand.splice(cardIndex, 1);
+    const opp = gs.players[1 - playerIdx];
+
+    if (card.effect === 'draw_two') {
+      draw(player, 2);
+      addLog(gs, `J${playerIdx + 1} pioche 2 cartes`);
+
+    } else if (card.effect === 'destroy_terrain') {
+      if (!opp.board.terrain) {
+        // remettre la carte en main si pas d'effet
+        player.hand.splice(cardIndex, 0, card);
+        return err("L'adversaire n'a pas de terrain");
+      }
+      const name = opp.board.terrain.name;
+      opp.board.terrain = null;
+      recalcStats(gs);
+      addLog(gs, `J${playerIdx + 1} détruit le terrain adverse (${name})`);
+
+    } else if (card.effect === 'destroy_state') {
+      if (!opp.board.state) {
+        player.hand.splice(cardIndex, 0, card);
+        return err("L'adversaire n'a pas d'état");
+      }
+      const name = opp.board.state.name;
+      opp.board.state = null;
+      recalcStats(gs);
+      addLog(gs, `J${playerIdx + 1} neutralise l'état adverse (${name})`);
+    }
+
   } else {
     return err('Type de carte inconnu');
   }
-
-  // Pioche 1 carte après avoir joué
-  draw(player, 1);
 
   return { ok: true };
 }
@@ -223,8 +245,6 @@ function handleEndTurn(gs, playerIdx) {
   if (gs.turn !== playerIdx) return err('Pas votre tour');
 
   const player = gs.players[playerIdx];
-  player.playedTerrain = false;
-  player.playedState   = false;
   player.board.animals.forEach(a => {
     a.hasAttackedThisTurn = false;
     a.canAttack = true; // fatigue levée

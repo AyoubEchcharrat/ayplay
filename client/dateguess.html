@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-  <title>HistoDate — Devinez l'année</title>
+  <title>FinDate — Devinez l'année</title>
   <link rel="stylesheet" href="dateguess.css"/>
 </head>
 <body>
@@ -18,7 +18,7 @@
 <!-- LOBBY                                                          -->
 <!-- ══════════════════════════════════════════════════════════════ -->
 <div id="screen-lobby" class="screen active">
-  <h1 class="logo">Histo<span>Date</span></h1>
+  <h1 class="logo">Fin<span>Date</span></h1>
   <p class="tagline">Devinez l'année de ces images historiques</p>
 
   <div class="card">
@@ -195,6 +195,9 @@
       <div class="round-indicator" id="round-indicator">Round — / —</div>
       <div class="players-row" id="players-row"></div>
 
+      <!-- Zoom button -->
+      <button class="btn-zoom-image" id="btn-zoom-image" title="Voir l'image en entier">⛶</button>
+
       <!-- Bottom title -->
       <div class="image-title-bar">
         <div class="image-category-tag" id="image-category">—</div>
@@ -290,6 +293,11 @@
       <button class="btn btn-secondary" id="btn-lobby">Retour au lobby</button>
     </div>
   </div>
+</div>
+
+<!-- Image zoom modal -->
+<div id="zoom-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.92);cursor:zoom-out;align-items:center;justify-content:center">
+  <img id="zoom-img" src="" alt="" style="max-width:96vw;max-height:96vh;object-fit:contain;border-radius:4px;pointer-events:none"/>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
