@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GENESIS — RPG Génératif</title>
+  <link id="font-link" rel="stylesheet" href=""/>
+  <link rel="stylesheet" href="rpg.css"/>
+</head>
+<body>
+
+<!-- ── Écran de départ ──────────────────────────────────────────── -->
+<div id="screen-start">
+  <div class="start-inner">
+    <div class="genesis-logo">GENESIS</div>
+    <p class="genesis-sub">Le jeu qui génère ton univers</p>
+
+    <div class="premise-box">
+      <label for="premise-input">Décris ton univers :</label>
+      <textarea id="premise-input" rows="3"
+        placeholder="Ex : RPG fantasy médiéval sombre avec des ruines elfiques...
+Visual novel romance lycée japonais sous la pluie...
+Survival post-apocalyptique dans une ville abandonnée...
+Slice of life d'un boulanger dans un village de montagne..."></textarea>
+      <div class="examples">
+        <span class="ex-tag" onclick="setEx(this)">⚔️ Fantasy sombre</span>
+        <span class="ex-tag" onclick="setEx(this)">💕 Visual novel romance</span>
+        <span class="ex-tag" onclick="setEx(this)">☢️ Survival post-apo</span>
+        <span class="ex-tag" onclick="setEx(this)">🌌 Space opera</span>
+        <span class="ex-tag" onclick="setEx(this)">🔍 Détective noir</span>
+        <span class="ex-tag" onclick="setEx(this)">🍵 Slice of life</span>
+      </div>
+    </div>
+
+    <button id="btn-start" onclick="startGame()">Générer mon univers</button>
+    <p class="start-note">Propulsé par Claude Opus · chaque partie est unique</p>
+  </div>
+</div>
+
+<!-- ── Écran de chargement ──────────────────────────────────────── -->
+<div id="screen-loading" class="hidden">
+  <div class="loading-inner">
+    <div class="genesis-logo">GENESIS</div>
+    <div class="loading-spinner"></div>
+    <p id="loading-msg">Tissage de l'univers en cours…</p>
+    <p id="loading-sub"></p>
+  </div>
+</div>
+
+<!-- ── Écran de jeu ──────────────────────────────────────────────── -->
+<div id="screen-game" class="hidden">
+
+  <!-- Header -->
+  <header id="game-header">
+    <div id="player-badge">
+      <span id="player-avatar"></span>
+      <div>
+        <div id="player-name"></div>
+        <div id="player-desc"></div>
+      </div>
+    </div>
+    <div id="world-info">
+      <span id="world-location"></span>
+      <span id="world-sep">·</span>
+      <span id="world-time"></span>
+      <span id="world-atmosphere"></span>
+    </div>
+    <button id="btn-new-game" onclick="newGame()">↩ Nouvel univers</button>
+  </header>
+
+  <!-- Corps du jeu -->
+  <div id="game-body">
+
+    <!-- Colonne gauche : stats + inventaire -->
+    <aside id="game-sidebar">
+      <section id="stats-section">
+        <h3 class="section-title">Stats</h3>
+        <div id="stats-list"></div>
+      </section>
+      <section id="inventory-section">
+        <h3 class="section-title">Inventaire</h3>
+        <div id="inventory-grid"></div>
+      </section>
+    </aside>
+
+    <!-- Colonne droite : narration + choix -->
+    <main id="game-main">
+      <div id="narrative-box">
+        <div id="narrative-text"></div>
+      </div>
+
+      <div id="choices-area">
+        <div id="choices-grid"></div>
+        <div id="custom-action-row">
+          <input id="custom-input" type="text" placeholder="Ou tape une action libre…"/>
+          <button id="btn-custom" onclick="doCustom()">→</button>
+        </div>
+      </div>
+
+      <!-- Loading dans la partie -->
+      <div id="turn-loading" class="hidden">
+        <div class="turn-dots"><span></span><span></span><span></span></div>
+        <span id="turn-loading-msg">GENESIS génère la suite…</span>
+      </div>
+    </main>
+  </div>
+
+</div>
+
+<!-- Overlay game over -->
+<div id="overlay" class="hidden">
+  <div id="overlay-box">
+    <div id="overlay-msg"></div>
+    <button onclick="newGame()">Nouvelle partie</button>
+  </div>
+</div>
+
+<script src="rpg.js"></script>
+</body>
+</html>

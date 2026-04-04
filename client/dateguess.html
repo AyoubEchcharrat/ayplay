@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <title>HistoDate — Devinez l'année</title>
+  <link rel="stylesheet" href="dateguess.css"/>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- LOBBY                                                          -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="screen-lobby" class="screen active">
+  <h1 class="logo">Histo<span>Date</span></h1>
+  <p class="tagline">Devinez l'année de ces images historiques</p>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-join-btn">Rejoindre</button>
+      <button class="tab-btn" id="tab-create-btn">Créer une room</button>
+    </div>
+
+    <!-- Partie commune -->
+    <p class="avatar-label">Choisis ton avatar</p>
+    <div class="avatar-grid" id="avatar-grid"></div>
+
+    <input type="text" id="input-nickname" placeholder="Ton pseudo" maxlength="20" autocomplete="off"/>
+
+    <!-- Panel Rejoindre -->
+    <div id="panel-join">
+      <input type="text" id="input-room-code" placeholder="Code de la room (ex: XK4R2F)" maxlength="6" autocomplete="off" style="text-transform:uppercase;letter-spacing:4px;font-family:monospace;font-weight:700;font-size:1.1rem;text-align:center;"/>
+      <button class="btn btn-primary" id="btn-join">Rejoindre</button>
+    </div>
+
+    <!-- Panel Créer -->
+    <div id="panel-create" style="display:none">
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label>Nombre de rounds</label>
+          <select id="set-rounds">
+            <option value="5">5 rounds</option>
+            <option value="10" selected>10 rounds</option>
+            <option value="15">15 rounds</option>
+            <option value="20">20 rounds</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>Temps par image</label>
+          <select id="set-time">
+            <option value="15">15 secondes</option>
+            <option value="30" selected>30 secondes</option>
+            <option value="45">45 secondes</option>
+            <option value="60">60 secondes</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>Difficulté</label>
+          <select id="set-difficulty">
+            <option value="all" selected>Toutes</option>
+            <option value="easy">Facile</option>
+            <option value="medium">Moyen</option>
+            <option value="hard">Difficile</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>Max joueurs</label>
+          <select id="set-maxplayers">
+            <option value="2">2</option>
+            <option value="4">4</option>
+            <option value="8" selected>8</option>
+            <option value="12">12</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>Indices à mi-temps</label>
+          <select id="set-hints">
+            <option value="true" selected>Activés</option>
+            <option value="false">Désactivés</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>Époque couverte</label>
+          <select id="set-era">
+            <option value="1820-2024" selected>1820 → 2024</option>
+            <option value="1820-1950">1820 → 1950</option>
+            <option value="1950-2024">1950 → 2024</option>
+            <option value="1960-2024">1960 → 2024</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btn-create">Créer la room</button>
+    </div>
+
+    <p class="error-msg" id="lobby-error"></p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- WAITING ROOM                                                   -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="screen-waiting" class="screen">
+  <div class="card" style="max-width:520px">
+    <h2>Salle d'attente</h2>
+
+    <p style="font-size:0.85rem;color:var(--text2);text-align:center;margin-bottom:4px">Code de la room — clique pour copier</p>
+    <div class="room-code-display" id="waiting-code" title="Cliquer pour copier">······</div>
+    <p class="copy-hint" id="copy-hint">📋 Cliquer pour copier</p>
+
+    <!-- Settings (host only) -->
+    <div id="host-settings" style="display:none;margin-bottom:16px">
+      <div class="settings-grid" id="host-settings-grid">
+        <div class="setting-item">
+          <label>Rounds</label>
+          <select id="hs-rounds">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>Temps / image</label>
+          <select id="hs-time">
+            <option value="15">15s</option>
+            <option value="30" selected>30s</option>
+            <option value="45">45s</option>
+            <option value="60">60s</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>Difficulté</label>
+          <select id="hs-difficulty">
+            <option value="all" selected>Toutes</option>
+            <option value="easy">Facile</option>
+            <option value="medium">Moyen</option>
+            <option value="hard">Difficile</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>Indices</label>
+          <select id="hs-hints">
+            <option value="true" selected>Activés</option>
+            <option value="false">Désactivés</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings display (non-host) -->
+    <div id="guest-settings" style="margin-bottom:16px;display:none">
+      <p style="font-size:0.8rem;color:var(--text2)" id="settings-summary"></p>
+    </div>
+
+    <h3>Joueurs (<span id="player-count">0</span>)</h3>
+    <div class="players-list" id="waiting-players"></div>
+
+    <div id="host-start-area">
+      <button class="btn btn-primary" id="btn-start" disabled>Lancer la partie</button>
+      <p class="waiting-msg" id="start-hint">En attente d'au moins 1 joueur…</p>
+    </div>
+    <!-- Bouton stop visible dans le lobby si la partie a été stoppée -->
+    <div id="host-stop-area" style="display:none;margin-top:8px">
+      <button class="btn btn-secondary" id="btn-stop-lobby" style="color:var(--red);border-color:var(--red)">⬛ Stopper la partie</button>
+    </div>
+    <div id="guest-wait-area" style="display:none">
+      <div class="connecting">
+        En attente que l'hôte lance la partie
+        <div class="dot-anim"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- GAME                                                           -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="screen-game" class="screen">
+  <div class="game-layout">
+    <div class="image-area" id="image-area">
+      <img id="game-image" class="game-image" src="" alt="" draggable="false"/>
+      <div class="image-overlay"></div>
+
+      <!-- Top bar -->
+      <div class="timer-bar-container">
+        <div class="timer-bar" id="timer-bar"></div>
+      </div>
+      <div class="timer-num" id="timer-num">—</div>
+      <div class="round-indicator" id="round-indicator">Round — / —</div>
+      <div class="players-row" id="players-row"></div>
+
+      <!-- Bottom title -->
+      <div class="image-title-bar">
+        <div class="image-category-tag" id="image-category">—</div>
+        <div class="image-title" id="image-title">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Date picker -->
+    <div class="date-picker-area" id="date-picker-area">
+      <div class="year-display-row">
+        <span class="year-label">Année estimée</span>
+        <span class="year-big" id="year-display">1969</span>
+        <span class="year-label" id="month-display-label"></span>
+      </div>
+
+      <div class="timeline-wrapper" id="timeline-wrapper">
+        <div class="decade-labels" id="decade-labels"></div>
+        <div class="timeline-track" id="timeline-track">
+          <div class="timeline-fill" id="timeline-fill"></div>
+          <div class="decade-ticks" id="decade-ticks"></div>
+          <div class="timeline-thumb" id="timeline-thumb"></div>
+        </div>
+      </div>
+
+      <div class="month-row" id="month-row"></div>
+      <p class="month-hint" id="month-hint">Optionnel : préciser le mois (+150 pts si exact)</p>
+
+      <div class="submit-row">
+        <button class="btn-submit" id="btn-guess">Valider ma réponse</button>
+        <span class="guess-count" id="guess-count">0/0 ont répondu</span>
+      </div>
+    </div>
+
+    <!-- Hint toast -->
+    <div class="hint-toast" id="hint-toast" style="display:none"></div>
+
+    <!-- Stop game button (host only) -->
+    <button class="btn-stop-game" id="btn-stop-game" style="display:none" title="Stopper la partie">⬛ Stop</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- ROUND RESULT                                                   -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="screen-round-result" class="screen">
+  <div class="round-result-card">
+    <div class="result-header">
+      <div class="result-title" id="rr-title">—</div>
+      <div class="correct-date-display" id="rr-correct-date">—</div>
+      <div class="result-hint" id="rr-hint"></div>
+    </div>
+
+    <div class="timeline-viz">
+      <div class="viz-track" id="viz-track">
+        <div class="viz-fill" id="viz-fill"></div>
+        <div class="viz-correct" id="viz-correct">
+          <span class="viz-correct-label" id="viz-correct-label"></span>
+          <div class="viz-correct-line"></div>
+        </div>
+      </div>
+      <div class="viz-year-labels" id="viz-year-labels"></div>
+    </div>
+
+    <div class="score-rows" id="score-rows"></div>
+
+    <div class="result-footer">
+      <span class="rounds-progress" id="rr-progress">Round 1/10</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-secondary" id="btn-stop-round" style="display:none;width:auto;padding:8px 16px;color:var(--red);border-color:var(--red)">⬛ Stop</button>
+        <button class="btn btn-primary" id="btn-next" style="width:auto;padding:10px 24px;display:none">
+          Suivant →
+        </button>
+        <span id="next-wait" style="font-size:0.85rem;color:var(--text2)">En attente de l'hôte…</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- FINAL RESULT                                                   -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="screen-final-result" class="screen">
+  <canvas id="confetti-canvas"></canvas>
+  <div class="final-card">
+    <div class="final-header">
+      <div class="winner-crown" id="winner-crown" style="display:none">👑</div>
+      <h2>Résultats finaux</h2>
+      <p class="final-subtitle" id="final-subtitle">Voici le classement de la partie !</p>
+    </div>
+    <div class="podium-list" id="podium-list"></div>
+    <div style="padding:16px 24px;display:flex;gap:10px">
+      <button class="btn btn-primary" id="btn-replay" style="display:none">Rejouer</button>
+      <button class="btn btn-secondary" id="btn-lobby">Retour au lobby</button>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="dateguess.js"></script>
+</body>
+</html>
