@@ -3,88 +3,209 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wild Cards</title>
-  <link rel="stylesheet" href="style.css"/>
+  <title>AyPlay — Joue avec tes amis</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0b0b0f;
+      --surface: #13131a;
+      --border: #252530;
+      --text1: #f0f0f5;
+      --text2: #888;
+      --accent: #7c6af7;
+      --accent2: #f0b429;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text1);
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+
+    /* ── Background grid ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(124,106,247,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124,106,247,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    /* ── Logo ── */
+    .logo {
+      font-size: 2.8rem;
+      font-weight: 900;
+      letter-spacing: -1px;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .logo span { color: var(--accent); }
+
+    .tagline {
+      color: var(--text2);
+      font-size: 0.95rem;
+      margin-bottom: 52px;
+      text-align: center;
+    }
+
+    /* ── Grid de jeux ── */
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .game-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 24px 24px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .game-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .game-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    }
+
+    .game-card:hover::before { opacity: 1; }
+
+    /* Couleurs d'accent par jeu */
+    .card-histodate { --c: #f0b429; }
+    .card-histodate:hover { border-color: #f0b429; box-shadow: 0 12px 40px rgba(240,180,41,0.15); }
+    .card-histodate::before { background: radial-gradient(ellipse at top left, rgba(240,180,41,0.07), transparent 60%); }
+
+    .card-wildcards { --c: #e63946; }
+    .card-wildcards:hover { border-color: #e63946; box-shadow: 0 12px 40px rgba(230,57,70,0.15); }
+    .card-wildcards::before { background: radial-gradient(ellipse at top left, rgba(230,57,70,0.07), transparent 60%); }
+
+    .card-genesis { --c: #7c6af7; }
+    .card-genesis:hover { border-color: #7c6af7; box-shadow: 0 12px 40px rgba(124,106,247,0.15); }
+    .card-genesis::before { background: radial-gradient(ellipse at top left, rgba(124,106,247,0.07), transparent 60%); }
+
+    .game-icon {
+      font-size: 2.4rem;
+      line-height: 1;
+    }
+
+    .game-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--c, var(--text1));
+    }
+
+    .game-desc {
+      font-size: 0.85rem;
+      color: var(--text2);
+      line-height: 1.5;
+    }
+
+    .game-badge {
+      margin-top: auto;
+      padding-top: 14px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text2);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .badge-accent {
+      background: rgba(var(--cr,124),var(--cg,106),var(--cb,247), 0.12);
+      color: var(--c, var(--accent));
+      border-color: transparent;
+    }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 52px;
+      color: var(--text2);
+      font-size: 0.78rem;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
 
-<!-- ── Lobby ─────────────────────────────────────────────────────── -->
-<div id="screen-lobby">
-  <h1>Wild Cards</h1>
-  <p class="subtitle">Jeu de cartes — 2 joueurs</p>
-  <input id="input-room" type="text" placeholder="Code de la room (ex: abc123)" maxlength="20" autocomplete="off"/>
-  <button id="btn-join">Rejoindre</button>
-  <p id="lobby-status"></p>
-</div>
+  <h1 class="logo">Ay<span>Play</span></h1>
+  <p class="tagline">Choisis ton jeu et joue avec tes amis</p>
 
-<!-- ── Jeu ───────────────────────────────────────────────────────── -->
-<div id="screen-game" class="hidden">
+  <div class="games-grid">
 
-  <!-- Ligne adversaire -->
-  <div class="player-row" id="opp-row">
-    <div id="opp-player-zone" class="player-info">
-      <span class="hp-badge" id="opp-hp-badge">♥ <span id="opp-hp">20</span></span>
-      <span class="deck-badge">🂠 <span id="opp-deck">—</span></span>
-      <span class="hand-badge">✋ <span id="opp-hand-count">—</span></span>
-    </div>
-    <div class="modifier-slots">
-      <div id="opp-terrain" class="modifier-slot"></div>
-      <div id="opp-state"   class="modifier-slot"></div>
-    </div>
+    <!-- HistoDate -->
+    <a href="/dateguess.html" class="game-card card-histodate">
+      <div class="game-icon">🗓️</div>
+      <div class="game-name">HistoDate</div>
+      <div class="game-desc">Devine l'année de photos historiques célèbres. Plus tu es précis, plus tu marques de points.</div>
+      <div class="game-badge">
+        <span class="badge badge-accent">Multijoueur</span>
+        <span class="badge">2 – 12 joueurs</span>
+        <span class="badge">Histoire</span>
+      </div>
+    </a>
+
+    <!-- Wild Cards -->
+    <a href="/wildcards.html" class="game-card card-wildcards">
+      <div class="game-icon">🃏</div>
+      <div class="game-name">Wild Cards</div>
+      <div class="game-desc">Jeu de cartes stratégique avec des animaux. Joue des terrains, des états, et attaque ton adversaire.</div>
+      <div class="game-badge">
+        <span class="badge badge-accent">2 joueurs</span>
+        <span class="badge">Cartes</span>
+        <span class="badge">Stratégie</span>
+      </div>
+    </a>
+
+    <!-- Genesis RPG -->
+    <a href="/rpg.html" class="game-card card-genesis">
+      <div class="game-icon">🔮</div>
+      <div class="game-name">Genesis</div>
+      <div class="game-desc">RPG génératif propulsé par l'IA. Décris ton univers et joue une aventure unique à chaque partie.</div>
+      <div class="game-badge">
+        <span class="badge badge-accent">Solo</span>
+        <span class="badge">IA générative</span>
+        <span class="badge">RPG</span>
+      </div>
+    </a>
+
   </div>
 
-  <!-- Board adversaire -->
-  <div id="opp-board-zone" class="board-zone">
-    <div id="opp-animals" class="animals-row"></div>
-  </div>
+  <footer>AyPlay &mdash; Tous les jeux sont gratuits</footer>
 
-  <!-- Séparateur central -->
-  <div id="mid-bar">
-    <span id="turn-indicator">—</span>
-  </div>
-
-  <!-- Board joueur -->
-  <div id="my-board-zone" class="board-zone clickable-zone">
-    <div id="my-animals" class="animals-row"></div>
-    <div id="play-hint-zone">Jouez ici</div>
-  </div>
-
-  <!-- Ligne joueur -->
-  <div class="player-row" id="my-row">
-    <div class="player-info">
-      <span class="hp-badge" id="my-hp-badge">♥ <span id="my-hp">20</span></span>
-      <span class="deck-badge">🂠 <span id="my-deck">—</span></span>
-      <button id="btn-end-turn" disabled>Fin de tour</button>
-    </div>
-    <div class="modifier-slots">
-      <div id="my-terrain" class="modifier-slot"></div>
-      <div id="my-state"   class="modifier-slot"></div>
-    </div>
-  </div>
-
-  <!-- Main -->
-  <div id="hand-zone">
-    <div id="hand"></div>
-  </div>
-
-  <!-- Barre du bas -->
-  <div id="bottom-bar">
-    <div id="log-zone"></div>
-    <div id="hint-zone"></div>
-  </div>
-
-</div>
-
-<!-- ── Overlay fin de partie ─────────────────────────────────────── -->
-<div id="overlay" class="hidden">
-  <div class="overlay-box">
-    <div id="overlay-msg"></div>
-    <button onclick="location.reload()">Rejouer</button>
-  </div>
-</div>
-
-<script src="/socket.io/socket.io.js"></script>
-<script src="assets/icons.js"></script>
-<script src="game.js"></script>
 </body>
 </html>
