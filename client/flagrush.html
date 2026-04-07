@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FlagRush — Trouve le drapeau !</title>
+  <link rel="stylesheet" href="flagrush.css"/>
+</head>
+<body>
+
+<a href="/" class="btn-hub" id="hub-btn">← Hub</a>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- LOBBY                                                          -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="screen-lobby" class="screen active">
+  <h1 class="logo">Flag<span>Rush</span></h1>
+  <p class="tagline">Trouve le bon drapeau avant tes adversaires !</p>
+
+  <div class="card">
+    <div class="tab-row">
+      <button class="tab-btn active" id="tab-join">Rejoindre</button>
+      <button class="tab-btn"        id="tab-create">Créer</button>
+    </div>
+
+    <p class="avatar-label">Choisis ton avatar</p>
+    <div class="avatar-grid" id="avatar-grid"></div>
+
+    <div id="panel-join">
+      <label>Pseudo</label>
+      <input id="input-name-join" type="text" placeholder="Ton pseudo" maxlength="20" autocomplete="off"/>
+      <label>Code de la room</label>
+      <input id="input-code" type="text" placeholder="Ex : ABC123" maxlength="8" autocomplete="off" style="text-transform:uppercase"/>
+      <button class="btn btn-primary" id="btn-join">Rejoindre</button>
+    </div>
+
+    <div id="panel-create" style="display:none">
+      <label>Pseudo</label>
+      <input id="input-name-create" type="text" placeholder="Ton pseudo" maxlength="20" autocomplete="off"/>
+      <button class="btn btn-primary" id="btn-create">Créer une room</button>
+    </div>
+
+    <p class="error-msg" id="lobby-error"></p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- WAITING ROOM                                                   -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="screen-waiting" class="screen">
+
+  <div class="room-code-display">
+    <div class="code-label">Code de la room</div>
+    <div class="code" id="waiting-code">------</div>
+  </div>
+
+  <div class="card">
+    <div id="waiting-players" class="players-list"></div>
+    <p class="error-msg" id="waiting-error"></p>
+  </div>
+
+  <!-- Settings (host only) -->
+  <div class="card" id="settings-card" style="display:none">
+    <div class="settings-title">⚙ Configuration</div>
+
+    <div class="settings-grid">
+      <div class="setting-item" style="grid-column:1/-1">
+        <label>Mode de jeu</label>
+        <div class="mode-btns">
+          <button class="mode-btn active" data-mode="marathon">🏃 Marathon</button>
+          <button class="mode-btn" data-mode="deathrun">💀 Deathrun</button>
+          <button class="mode-btn" data-mode="speedrun">⚡ Speedrun</button>
+        </div>
+      </div>
+
+      <div class="setting-item" id="opt-numOptions">
+        <label>Drapeaux par question</label>
+        <select id="sel-numOptions">
+          <option value="2">2 drapeaux</option>
+          <option value="4" selected>4 drapeaux</option>
+        </select>
+      </div>
+
+      <div class="setting-item" id="opt-timer">
+        <label>Temps par question</label>
+        <select id="sel-timer">
+          <option value="10" selected>10 sec</option>
+          <option value="20">20 sec</option>
+          <option value="30">30 sec</option>
+        </select>
+      </div>
+
+      <div class="setting-item" id="opt-rounds">
+        <label>Nombre de rounds</label>
+        <select id="sel-rounds">
+          <option value="10">10 rounds</option>
+          <option value="20" selected>20 rounds</option>
+          <option value="30">30 rounds</option>
+          <option value="50">50 rounds</option>
+          <option value="100">100 rounds</option>
+        </select>
+      </div>
+
+      <div class="setting-item" id="opt-speedtime" style="display:none">
+        <label>Durée globale</label>
+        <select id="sel-speedtime">
+          <option value="30">30 secondes</option>
+          <option value="60" selected>1 minute</option>
+          <option value="300">5 minutes</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div style="width:100%;max-width:480px">
+    <button class="btn btn-primary" id="btn-start" style="display:none">Lancer la partie →</button>
+    <button class="btn btn-secondary" id="btn-leave-waiting">Quitter</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- QUESTION                                                       -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="screen-question" class="screen">
+
+  <div class="question-header">
+    <span class="round-badge" id="q-round">Round 1</span>
+    <span class="speedrun-timer" id="speedrun-timer" style="display:none">60</span>
+    <span class="score-badge" id="q-score" style="display:none">0 pts</span>
+  </div>
+
+  <div class="timer-bar-wrap">
+    <div class="timer-bar" id="timer-bar"></div>
+  </div>
+
+  <div class="country-name" id="q-country">France</div>
+
+  <div class="flags-grid opts-4" id="flags-grid"></div>
+
+  <div class="answered-dots" id="answered-dots"></div>
+
+  <div class="alive-strip" id="alive-strip"></div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- ROUND RESULT                                                   -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="screen-result" class="screen">
+  <div class="result-card">
+    <div class="result-header">
+      <div class="result-country" id="res-country"></div>
+      <div class="result-flag-wrap">
+        <img class="result-flag" id="res-flag" src="" alt=""/>
+      </div>
+    </div>
+    <div class="result-players" id="res-players"></div>
+    <div class="result-footer">
+      <button class="btn btn-secondary" id="btn-stop-result" style="display:none">Stopper</button>
+      <button class="btn btn-primary"   id="btn-next"       style="display:none">Suivant →</button>
+      <p style="color:var(--text2);font-size:0.85rem;margin:auto 0" id="res-wait">En attente de l'hôte…</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- FINAL                                                          -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="screen-final" class="screen">
+  <div class="final-card">
+    <div class="final-header">
+      <div class="final-title" id="final-title">🏆 Résultats</div>
+      <div class="final-subtitle" id="final-subtitle"></div>
+    </div>
+    <div class="final-podium" id="final-podium"></div>
+    <div class="final-footer">
+      <button class="btn btn-secondary" id="btn-lobby">Quitter</button>
+      <button class="btn btn-primary"   id="btn-replay" style="display:none">Rejouer</button>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="flagrush.js"></script>
+</body>
+</html>

@@ -4,6 +4,7 @@ const http     = require('http');
 const { Server } = require('socket.io');
 const path     = require('path');
 const { initDateGuessGame } = require('./dateGuessServer');
+const { initFlagGame }      = require('./flagServer');
 
 const { joinRoom, leaveRoom, getRoom } = require('./gameRoom');
 const {
@@ -110,8 +111,11 @@ io.on('connection', (socket) => {
   });
 });
 
-// ── HistoDate (jeu de devinette de dates) ─────────────────────
+// ── FinDate (jeu de devinette de dates) ───────────────────────
 initDateGuessGame(io);
+
+// ── FlagRush (jeu de drapeaux multijoueur) ─────────────────────
+initFlagGame(io);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Serveur lancé → http://localhost:${PORT}`));
