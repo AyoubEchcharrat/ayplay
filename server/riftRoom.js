@@ -130,6 +130,7 @@ class RiftRoom {
       turnOrder: this.turnOrder,
       currentPieceId,
       currentTeam,
+      placementTeam: this.placementQueue?.[0] || null,
       winner:  this.winner,
       log:     this.log.slice(-20),
       terrain: this.terrain,
@@ -141,24 +142,18 @@ class RiftRoom {
   chooseDraft(playerId, championIds) {
     const player = this.players.get(playerId);
     if (!player) return;
-    if (this.phase !== 'lobby') return;
+    if (this.phase !== 'draft') return;
     // Validate: 5 unique valid champions
     if (!Array.isArray(championIds) || championIds.length !== 5) return;
     if (championIds.some(id => !CHAMPIONS[id])) return;
     if (new Set(championIds).size !== championIds.length) return;
 
-    // Ensure no overlap with opponent's picks
-    const opponent = [...this.players.values()].find(p => p.id !== playerId);
-    if (opponent && opponent.chosenChampions.length > 0) {
-      const opponentSet = new Set(opponent.chosenChampions);
-      if (championIds.some(id => opponentSet.has(id))) return;
-    }
 
     player.chosenChampions = championIds;
     player.ready = true;
 
     this.log.push(`${player.name} a choisi ses champions.`);
-    this.broadcast('rift:state', this.publicState());
+    this.broadcast('rb:state', this.publicState());
 
     const players = [...this.players.values()];
     if (players.length === 2 && players.every(p => p.ready)) {
@@ -190,7 +185,7 @@ class RiftRoom {
     for (const p of this.players.values()) p.ready = false;
 
     this.log.push('Phase de placement commencée. Équipe bleue place en premier.');
-    this.broadcast('rift:state', this.publicState());
+    this.broadcast('rb:state', this.publicState());
   }
 
   placeChampion(playerId, championId, row, col) {
@@ -264,7 +259,7 @@ class RiftRoom {
     }
 
     this.log.push(`${player.name} a placé ${champDef.name} en (${row},${col}).`);
-    this.broadcast('rift:state', this.publicState());
+    this.broadcast('rb:state', this.publicState());
 
     // Check if all placed
     const allPlayers = [...this.players.values()];
@@ -292,7 +287,7 @@ class RiftRoom {
     this.turnOrder = alivePieces.map(p => p.id);
 
     this.log.push('Partie commencée! Tour 1');
-    this.broadcast('rift:state', this.publicState());
+    this.broadcast('rb:state', this.publicState());
   }
 
   // ── Turn helpers ──────────────────────────────────────────────────────────────
@@ -564,7 +559,7 @@ class RiftRoom {
     }
 
     this.log.push(`${this._pieceName(piece)} se déplace en (${targetRow},${targetCol}).`);
-    this.broadcast('rift:state', this.publicState());
+    this.broadcast('rb:state', this.publicState());
     return { ok: true };
   }
 
@@ -622,7 +617,7 @@ class RiftRoom {
         const dc = piece.col < targetPiece.col ? -1 : 1;
         this.pushPiece(piece, dr, dc, 2);
         piece.actedThisTurn.attacked = true;
-        this.broadcast('rift:state', this.publicState());
+        this.broadcast('rb:state', this.publicState());
         return { ok: true };
       }
 
@@ -684,7 +679,7 @@ class RiftRoom {
     }
 
     piece.actedThisTurn.attacked = true;
-    this.broadcast('rift:state', this.publicState());
+    this.broadcast('rb:state', this.publicState());
     return { ok: true };
   }
 
@@ -722,7 +717,7 @@ class RiftRoom {
     }
 
     this.log.push(`${this._pieceName(piece)} lance ${spell.name}!`);
-    this.broadcast('rift:state', this.publicState());
+    this.broadcast('rb:state', this.publicState());
     return { ok: true };
   }
 
@@ -1519,7 +1514,7 @@ class RiftRoom {
     // Skip stunned or dead pieces
     this._skipInvalidPieces();
 
-    this.broadcast('rift:state', this.publicState());
+    this.broadcast('rb:state', this.publicState());
   }
 
   _applyStartOfRoundEffects(piece) {
@@ -1634,8 +1629,8 @@ class RiftRoom {
     this.winner = winner;
     this.phase  = 'finished';
     this.log.push(`Partie terminée! L'équipe ${winner === 'blue' ? 'bleue' : 'rouge'} remporte la victoire!`);
-    this.broadcast('rift:state', this.publicState());
-    this.broadcast('rift:game_end', { winner });
+    this.broadcast('rb:state', this.publicState());
+    this.broadcast('rb:game_end', { winner });
   }
 }
 
