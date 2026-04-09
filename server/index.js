@@ -117,5 +117,9 @@ initDateGuessGame(io);
 // ── FlagRush (jeu de drapeaux multijoueur) ─────────────────────
 initFlagGame(io);
 
+// ── RiftBoard (jeu de plateau tactique) ────────────────────────
+const { initRiftGame } = require('./riftServer');
+initRiftGame(io);
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Serveur lancé → http://localhost:${PORT}`));

@@ -56,6 +56,16 @@ function initFlagGame(io) {
       r.broadcast('fg:lobby', { players: r.publicPlayers(), settings: r.settings });
     });
 
+    // Stop game and return everyone to lobby
+    // Host can stop at any time; any player can trigger after game ends
+    socket.on('fg:stop', () => {
+      const r = room();
+      if (!r) return;
+      if (r.hostId !== socket.id && r.state !== 'finished') return;
+      r.reset();
+      r.broadcast('fg:lobby', { players: r.publicPlayers(), settings: r.settings });
+    });
+
     socket.on('fg:kick', ({ playerId }) => {
       const r = room();
       if (!r || r.hostId !== socket.id) return;

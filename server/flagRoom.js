@@ -6,7 +6,6 @@ const DEFAULT_SETTINGS = {
   timerPerQuestion: 10,    // seconds per question (deathrun/marathon)
   numRounds: 20,           // marathon total rounds
   speedrunTime: 60,        // speedrun global duration (seconds)
-  speedrunQuestionTime: 4, // seconds per question in speedrun
 };
 
 class FlagRoom {
@@ -17,14 +16,15 @@ class FlagRoom {
     this.state   = 'lobby';
     this.settings = { ...DEFAULT_SETTINGS };
 
-    this.questions     = [];
-    this.questionIndex = 0;
-    this.answers       = new Map(); // playerId → {code, correct}
-    this.alive         = new Set();
+    this.questions        = [];
+    this.questionIndex    = 0;
+    this.answers          = new Map(); // playerId → {code, correct}
+    this.alive            = new Set();
+    this.initialAliveCount = 0;
+    this.playerQIndex     = new Map(); // speedrun: per-player question index
 
     this.timer            = null;
     this.tickInterval     = null;
-    this.questionInterval = null;
     this.speedrunInterval = null;
     this.speedrunRemaining = 0;
   }
@@ -62,6 +62,8 @@ class FlagRoom {
     this.questionIndex = 0;
     this.answers.clear();
     this.alive.clear();
+    this.playerQIndex.clear();
+    this.initialAliveCount = 0;
     for (const p of this.players.values()) { p.score = 0; p.alive = true; }
   }
 
@@ -72,10 +74,13 @@ class FlagRoom {
     this.state = 'playing';
     this.questionIndex = 0;
     this.answers.clear();
+    this.playerQIndex.clear();
     this.alive = new Set(this.players.keys());
+    this.initialAliveCount = this.players.size;
     for (const p of this.players.values()) { p.score = 0; p.alive = true; }
 
-    const count = mode === 'marathon' ? numRounds : 200;
+    // Generate enough questions
+    const count = mode === 'marathon' ? numRounds : 500;
     this.questions = generateSequence(count, numOptions);
 
     this.broadcast('fg:game_started', { mode, settings: this.settings });
@@ -120,22 +125,33 @@ class FlagRoom {
   }
 
   submitAnswer(playerId, code) {
-    if (this.state !== 'question' && this.state !== 'speedrun') return;
-
-    // Speedrun: handled separately
+    // ── Speedrun: per-player independent questions ──
     if (this.state === 'speedrun') {
-      if (this.answers.has(playerId)) return;
-      const q = this.questions[this.questionIndex % this.questions.length];
+      const qIdx = this.playerQIndex.get(playerId) ?? 0;
+      const q = this.questions[qIdx % this.questions.length];
       const correct = code === q.correctCode;
-      this.answers.set(playerId, { code, correct });
-      if (correct) {
-        const p = this.players.get(playerId);
-        if (p) p.score++;
+      const p = this.players.get(playerId);
+      if (p && correct) p.score++;
+
+      const nextIdx = qIdx + 1;
+      this.playerQIndex.set(playerId, nextIdx);
+
+      // Broadcast updated scores to all
+      this.broadcast('fg:scores', { scores: this._scoreMap() });
+
+      // Send next question immediately to this player
+      if (p && this.speedrunRemaining > 0) {
+        p.socket.emit('fg:speedrun_next', {
+          reveal:   { correctCode: q.correctCode, wasCorrect: correct },
+          question: this._getSpeedrunQ(nextIdx),
+          score:    p.score,
+        });
       }
-      this.broadcast('fg:player_answered', { playerId, scores: this._scoreMap() });
       return;
     }
 
+    // ── Deathrun / Marathon ──
+    if (this.state !== 'question') return;
     if (!this.alive.has(playerId)) return;
     if (this.answers.has(playerId)) return;
 
@@ -160,27 +176,34 @@ class FlagRoom {
     const q   = this.questions[this.questionIndex];
     const mode = this.settings.mode;
 
-    // Build answer map
+    // Build answer map — unanswered alive players = wrong
     const answerMap = {};
     for (const [pid, ans] of this.answers) answerMap[pid] = ans;
-
-    // Unanswered alive players count as wrong
     for (const pid of this.alive) {
       if (!this.answers.has(pid)) answerMap[pid] = { code: null, correct: false };
     }
 
     const eliminated = [];
+
     if (mode === 'deathrun') {
+      // Score correct answers, then eliminate wrong ones
+      const toEliminate = [];
       for (const pid of this.alive) {
-        if (!answerMap[pid]?.correct) {
-          this.alive.delete(pid);
+        if (answerMap[pid]?.correct) {
           const p = this.players.get(pid);
-          if (p) p.alive = false;
-          eliminated.push(pid);
+          if (p) p.score++;
+        } else {
+          toEliminate.push(pid);
         }
       }
+      for (const pid of toEliminate) {
+        this.alive.delete(pid);
+        const p = this.players.get(pid);
+        if (p) p.alive = false;
+        eliminated.push(pid);
+      }
     } else {
-      // marathon: +1 for correct
+      // Marathon: +1 for correct
       for (const [pid, ans] of Object.entries(answerMap)) {
         if (ans.correct) {
           const p = this.players.get(pid);
@@ -189,7 +212,7 @@ class FlagRoom {
       }
     }
 
-    const winner = (mode === 'deathrun' && this.alive.size === 1) ? [...this.alive][0] : null;
+    // Deathrun ends ONLY when everyone is eliminated
     const allOut = mode === 'deathrun' && this.alive.size === 0;
 
     this.broadcast('fg:round_end', {
@@ -198,7 +221,6 @@ class FlagRoom {
       eliminated,
       alive:       [...this.alive],
       players:     this.publicPlayers(),
-      winner,
       allOut,
       round:       this.questionIndex + 1,
     });
@@ -206,8 +228,8 @@ class FlagRoom {
     this.questionIndex++;
 
     const marathonDone = mode === 'marathon' && this.questionIndex >= this.settings.numRounds;
-    if (winner || allOut || marathonDone) {
-      setTimeout(() => this.endGame(), 4000);
+    if (allOut || marathonDone) {
+      this.endGame();
     }
     // else: host manually calls nextQuestion()
   }
@@ -219,51 +241,39 @@ class FlagRoom {
   // ── Speedrun ──────────────────────────────────────────────────────
 
   _startSpeedrun() {
-    const { speedrunTime, speedrunQuestionTime } = this.settings;
+    const { speedrunTime } = this.settings;
     this.speedrunRemaining = speedrunTime;
     this.state = 'speedrun';
 
+    // Global countdown
     this.speedrunInterval = setInterval(() => {
       this.speedrunRemaining--;
       this.broadcast('fg:speedrun_tick', { remaining: this.speedrunRemaining });
       if (this.speedrunRemaining <= 0) {
         clearInterval(this.speedrunInterval);
-        clearInterval(this.questionInterval);
         this.endGame();
       }
     }, 1000);
 
-    this._sendSpeedrunQuestion();
-
-    this.questionInterval = setInterval(() => {
-      if (this.speedrunRemaining <= 0) return;
-      // Flash correct answer briefly
-      const q = this.questions[this.questionIndex % this.questions.length];
-      this.broadcast('fg:speedrun_reveal', {
-        correctCode: q.correctCode,
-        answers: Object.fromEntries(this.answers),
-        players: this.publicPlayers(),
+    // Send first question to each player independently
+    for (const p of this.players.values()) {
+      this.playerQIndex.set(p.id, 0);
+      p.socket.emit('fg:speedrun_next', {
+        reveal:   null,  // no previous answer
+        question: this._getSpeedrunQ(0),
+        score:    0,
       });
-      this.answers.clear();
-      this.questionIndex++;
-      setTimeout(() => {
-        if (this.speedrunRemaining > 0) this._sendSpeedrunQuestion();
-      }, 600);
-    }, speedrunQuestionTime * 1000);
+    }
   }
 
-  _sendSpeedrunQuestion() {
-    const q = this.questions[this.questionIndex % this.questions.length];
-    this.answers.clear();
-    this.broadcast('fg:question', {
+  _getSpeedrunQ(qIndex) {
+    const q = this.questions[qIndex % this.questions.length];
+    return {
       correctCode: q.correctCode,
       countryName: q.countryName,
       options:     q.options,
-      round:       this.questionIndex + 1,
-      totalRounds: null,
-      timeLimit:   this.settings.speedrunQuestionTime,
-      alivePlayers: null,
-    });
+      qIndex:      qIndex + 1,
+    };
   }
 
   _scoreMap() {
@@ -284,7 +294,6 @@ class FlagRoom {
   _clearTimers() {
     if (this.timer)            { clearTimeout(this.timer);             this.timer = null; }
     if (this.tickInterval)     { clearInterval(this.tickInterval);     this.tickInterval = null; }
-    if (this.questionInterval) { clearInterval(this.questionInterval); this.questionInterval = null; }
     if (this.speedrunInterval) { clearInterval(this.speedrunInterval); this.speedrunInterval = null; }
   }
 }

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RiftBoard — Stratégie Tactique</title>
+  <link rel="stylesheet" href="riftboard.css"/>
+</head>
+<body>
+
+<a href="/" class="btn-hub" id="hub-btn">← Hub</a>
+
+<!-- ══════════════════════════════════════════════════════ LOBBY -->
+<div id="screen-lobby" class="screen active">
+  <h1 class="logo">Rift<span>Board</span></h1>
+  <p class="tagline">Stratégie tactique — Détruisez les 3 fontaines adverses</p>
+  <div class="card">
+    <div class="tab-row">
+      <button class="tab-btn active" id="tab-join">Rejoindre</button>
+      <button class="tab-btn" id="tab-create">Créer</button>
+    </div>
+    <p class="avatar-label">Avatar</p>
+    <div class="avatar-grid" id="avatar-grid"></div>
+    <div id="panel-join">
+      <label>Pseudo</label>
+      <input id="inp-name-join" type="text" placeholder="Ton pseudo" maxlength="20" autocomplete="off"/>
+      <label>Code de room</label>
+      <input id="inp-code" type="text" placeholder="Ex: ABC123" maxlength="8" autocomplete="off" style="text-transform:uppercase"/>
+      <button class="btn btn-primary" id="btn-join">Rejoindre</button>
+    </div>
+    <div id="panel-create" style="display:none">
+      <label>Pseudo</label>
+      <input id="inp-name-create" type="text" placeholder="Ton pseudo" maxlength="20" autocomplete="off"/>
+      <button class="btn btn-primary" id="btn-create">Créer une room</button>
+    </div>
+    <p class="error-msg" id="lobby-error"></p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ WAITING -->
+<div id="screen-waiting" class="screen">
+  <h2 class="logo" style="font-size:1.8rem">Rift<span>Board</span></h2>
+  <div class="room-code-display">
+    <div class="code-label">Code de room</div>
+    <div class="code" id="waiting-code">------</div>
+  </div>
+  <div class="card" style="max-width:500px">
+    <div id="waiting-players" class="players-list"></div>
+    <p class="error-msg" id="waiting-error"></p>
+    <button class="btn btn-primary" id="btn-start-draft" style="display:none;margin-top:12px">Lancer le draft →</button>
+    <p id="waiting-for" style="color:var(--text2);text-align:center;font-size:0.9rem;margin-top:8px">En attente d'un adversaire…</p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════ DRAFT -->
+<div id="screen-draft" class="screen">
+  <div class="draft-header">
+    <h2>Phase de Draft</h2>
+    <p id="draft-subtitle">Choisissez 5 champions</p>
+  </div>
+  <div class="draft-layout">
+    <div class="draft-grid" id="draft-grid"></div>
+    <div class="draft-sidebar">
+      <div id="draft-selected-list"></div>
+      <div id="champ-detail" class="champ-detail" style="display:none">
+        <div class="champ-detail-header">
+          <span class="champ-detail-emoji" id="cd-emoji"></span>
+          <div>
+            <div class="champ-detail-name" id="cd-name"></div>
+            <div class="champ-detail-title" id="cd-title"></div>
+            <div class="champ-detail-class" id="cd-class"></div>
+          </div>
+        </div>
+        <div class="champ-stats" id="cd-stats"></div>
+        <div class="champ-spells" id="cd-spells"></div>
+      </div>
+      <button class="btn btn-primary" id="btn-confirm-draft" style="margin-top:12px" disabled>Confirmer la sélection</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ PLACEMENT -->
+<div id="screen-placement" class="screen">
+  <div class="placement-header">
+    <h2>Phase de Placement</h2>
+    <p id="placement-subtitle">Placez vos champions dans votre base</p>
+  </div>
+  <div class="game-layout">
+    <div class="board-container">
+      <div class="board" id="board-placement"></div>
+    </div>
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">Champions à placer</div>
+        <div id="placement-queue" class="placement-queue"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ GAME -->
+<div id="screen-game" class="screen">
+  <div class="game-topbar">
+    <div class="topbar-left">
+      <span id="game-round" class="round-badge">Tour 1</span>
+      <span id="game-phase-label" class="phase-label">En cours</span>
+    </div>
+    <div class="topbar-center" id="turn-order-bar"></div>
+    <div class="topbar-right">
+      <button class="btn btn-sm btn-danger" id="btn-surrender">Abandonner</button>
+    </div>
+  </div>
+
+  <div class="game-layout">
+    <!-- Board -->
+    <div class="board-container">
+      <div class="board" id="board-game"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Active piece info -->
+      <div class="sidebar-section" id="active-piece-panel" style="display:none">
+        <div class="sidebar-title">Champion actif</div>
+        <div id="active-piece-info"></div>
+        <div class="action-buttons" id="action-buttons">
+          <button class="act-btn" id="act-move"    data-action="move">🚶 Déplacer</button>
+          <button class="act-btn" id="act-attack"  data-action="attack">⚔️ Attaquer</button>
+          <button class="act-btn" id="act-s1"      data-action="s1">Sort 1</button>
+          <button class="act-btn" id="act-s2"      data-action="s2">Sort 2</button>
+          <button class="act-btn" id="act-ultim"   data-action="ultim">✨ Ultim</button>
+          <button class="act-btn btn-end-turn" id="act-end">Fin de tour →</button>
+        </div>
+      </div>
+
+      <!-- Piece detail (hovered) -->
+      <div class="sidebar-section" id="hovered-piece-panel" style="display:none">
+        <div class="sidebar-title">Info</div>
+        <div id="hovered-piece-info"></div>
+      </div>
+
+      <!-- Fountain status -->
+      <div class="sidebar-section">
+        <div class="sidebar-title">Fontaines</div>
+        <div id="fountain-status"></div>
+      </div>
+
+      <!-- Log -->
+      <div class="sidebar-section">
+        <div class="sidebar-title">Journal</div>
+        <div id="game-log" class="game-log"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ FINISHED -->
+<div id="screen-finished" class="screen">
+  <div class="finished-card">
+    <div class="finished-title" id="fin-title">🏆 Victoire !</div>
+    <div class="finished-sub" id="fin-sub"></div>
+    <div class="fin-stats" id="fin-stats"></div>
+    <button class="btn btn-primary" id="btn-rematch" style="display:none">Revanche →</button>
+    <button class="btn btn-secondary" id="btn-quit-fin">Quitter</button>
+  </div>
+</div>
+
+<!-- Champion tooltip -->
+<div id="tooltip" class="tooltip" style="display:none"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="riftboard.js"></script>
+</body>
+</html>

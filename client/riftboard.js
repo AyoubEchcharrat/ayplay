@@ -1,0 +1,1044 @@
+/* ══════════════════════════════════════════════════════════════
+   RiftBoard — Client JS
+   ══════════════════════════════════════════════════════════════ */
+
+const socket = io('/rb');
+
+// ── State ──────────────────────────────────────────────────────
+const S = {
+  myId: null,
+  myTeam: null,
+  roomCode: null,
+  phase: 'lobby',
+  gameState: null,
+  selectedChampions: [],
+  selectedAction: null,  // 'move'|'attack'|'s1'|'s2'|'ultim'
+  activePieceId: null,
+  placingChampionId: null,
+  hoveredPiece: null,
+};
+
+// Champion definitions (mirrored from server for display)
+const CHAMPIONS = {
+  karek:  { name:'Karek',  title:'Le Brise-Ligne',         class:'Tank-Guerrier', element:'terre',   emoji:'🪨', spd:2,
+    s1:{name:'Charge Tellurique',   desc:'Fonce en ligne droite sur 4 cases, renverse les ennemis.'},
+    s2:{name:'Frappe Sismique',     desc:'Frappe en arc avant, ralentit les ennemis 1 tour.'},
+    u:{name:'Pilier de Terre',      desc:'Immobile 2 tours, renvoie 40% des dégâts.'},
+    stats:{hp:2800,atk:220,arm:60,rm:30,spd:2,move:2,atkRange:1} },
+  lysha:  { name:'Lysha',  title:'La Lame-Fantôme',         class:'Assassin',      element:'vent',    emoji:'🗡️', spd:5,
+    s1:{name:'Bond Diagonal',       desc:'Téléporte en diagonale et attaque en arrivant.'},
+    s2:{name:'Lacération en X',     desc:'4 diagonales: dégâts + saignement 3 tours.'},
+    u:{name:'Lame du Néant',        desc:'Ignore l\'armure. Exécute si cible < 35% PV.'},
+    stats:{hp:1300,atk:280,arm:20,rm:25,spd:5,move:3,atkRange:1} },
+  syal:   { name:'Syal',   title:'Le Tisserand d\'Ombre',   class:'Mage',          element:'ombre',   emoji:'🌑', spd:4,
+    s1:{name:'Voile Noir',          desc:'Invisible 1 tour + invoque une Ombre adjacente.'},
+    s2:{name:'Transposition',       desc:'Switch de position avec son Ombre.'},
+    u:{name:'Convergence',          desc:'Frappe avec l\'Ombre simultanément, ignore RM.'},
+    stats:{hp:1600,atk:240,arm:25,rm:50,spd:4,move:3,atkRange:2} },
+  velara: { name:'Vélara', title:'L\'Ensorcelleuse des Marées', class:'Mage-Support', element:'eau',  emoji:'🌊', spd:3,
+    s1:{name:'Vague Horizontale',   desc:'Onde sur toute la rangée, pousse les ennemis.'},
+    s2:{name:'Brume Glacée',        desc:'Zone 2x2: ralentit et réduit l\'ATK 2 tours.'},
+    u:{name:'Déluge',               desc:'5 cases: éteint Embrasé alliés, 400 dégâts ennemis Feu.'},
+    stats:{hp:1700,atk:200,arm:30,rm:55,spd:3,move:2,atkRange:2} },
+  pyrox:  { name:'Pyrox',  title:'Le Brasier Vivant',        class:'Mage',          element:'feu',    emoji:'🔥', spd:3,
+    s1:{name:'Trait de Feu',        desc:'Tir ligne 6 cases: 350 dégâts + Embrasé.'},
+    s2:{name:'Explosion Diagonale', desc:'2 flammes diagonales avant, AoE à l\'impact.'},
+    u:{name:'Éruption',             desc:'Explosion rayon 3: 500 dégâts à tous, -200 PV soi.'},
+    stats:{hp:1500,atk:260,arm:20,rm:45,spd:3,move:2,atkRange:2} },
+  gorath: { name:'Gorath', title:'La Forteresse',            class:'Tank',          element:'terre',  emoji:'🏰', spd:1,
+    s1:{name:'Mur de Pierre',       desc:'Crée un mur 3 cases horizontal, bloque 2 tours.'},
+    s2:{name:'Provocation',         desc:'Force ennemis rayon 2 à le cibler 1 tour.'},
+    u:{name:'Bastion Absolu',       desc:'Invulnérable 2 tours, renvoie 50% des dégâts.'},
+    stats:{hp:3800,atk:180,arm:90,rm:60,spd:1,move:1,atkRange:1} },
+  aelys:  { name:'Aelys',  title:'La Gardienne',             class:'Support',       element:'lumière',emoji:'✨', spd:3,
+    s1:{name:'Rayon de Soin',       desc:'Ligne 3 cases: soigne allié 350 PV ou blesse ennemi.'},
+    s2:{name:'Croix de Lumière',    desc:'Diagonales: soigne alliés 150 PV, blesse ennemis.'},
+    u:{name:'Renaissance',          desc:'Ressuscite un allié éliminé avec 600 PV. (1×/game)'},
+    stats:{hp:1400,atk:160,arm:35,rm:65,spd:3,move:2,atkRange:2} },
+  rohn:   { name:'Rohn',   title:'Le Traqueur',              class:'Chasseur',      element:'nature', emoji:'🏹', spd:4,
+    s1:{name:'Flèche Longue Portée',desc:'Tir ligne 7 cases. ×2 dégâts si cible empoisonnée.'},
+    s2:{name:'Piège Diagonal',      desc:'Pose 2 pièges diagonaux: immobilise + 150 dégâts.'},
+    u:{name:'Traque Sans Fin',      desc:'Marque une cible 3 tours: +1 move vers elle, poison auto.'},
+    stats:{hp:1900,atk:230,arm:40,rm:35,spd:4,move:3,atkRange:3} },
+  vek:    { name:'Vek',    title:'La Bête des Profondeurs',  class:'Tank-Bruiser',  element:'bête',   emoji:'🦷', spd:2,
+    s1:{name:'Morsure Voraces',     desc:'Mêlée: vole 30% dégâts en PV (60% si cible saigne).'},
+    s2:{name:'Rugissement',         desc:'3 cases devant: repousse les ennemis d\'1 case.'},
+    u:{name:'Rage des Abysses',     desc:'2 tours: attaques frappent aussi 2 diagonales avant.'},
+    stats:{hp:2600,atk:250,arm:55,rm:40,spd:2,move:2,atkRange:1} },
+  zhen:   { name:'Zhen',   title:'Le Moine de l\'Éclair',   class:'Duelliste',     element:'foudre', emoji:'⚡', spd:4,
+    s1:{name:'Chaîne d\'Éclairs',  desc:'Ligne 5 cases, rebondit 2× en diagonale (70%/rebond).'},
+    s2:{name:'Dash Électrique',     desc:'Dash diagonal 3 cases, traînée électrique derrière.'},
+    u:{name:'Tempête Convergente',  desc:'Éclairs 8 directions, 300 dégâts. Étourdi 1 tour après.'},
+    stats:{hp:1800,atk:210,arm:35,rm:45,spd:4,move:3,atkRange:2} },
+};
+
+const CHAMPION_LIST = ['karek','lysha','syal','velara','pyrox','gorath','aelys','rohn','vek','zhen'];
+
+const STATUS_ICONS = {
+  'embrasé':'🔥','saignement':'🩸','poison':'🟢','ralenti':'🐢','gelé':'❄️',
+  'immobilisé':'⛓️','étourdi':'💫','invisible':'👻','provoqué':'😤',
+  'pilier':'🪨','bastion':'🛡️','rage':'😡','immunisé_embrasé':'🧯',
+};
+
+const TERRAIN_COLORS = {
+  lane:'cell-lane', jungle:'cell-jungle', river:'cell-river',
+  bridge:'cell-bridge', base:'cell-base', fountain:'cell-fountain',
+};
+
+const AVATARS = ['🦊','🐺','🦁','🐻','🐼','🦋','🐙','🦈','🦅','🦉','🌙','⭐','🔥','💎','🎭','🎯','🚀','⚡'];
+
+let selectedAvatar = '🦊';
+
+// ── Utility ────────────────────────────────────────────────────
+const el = id => document.getElementById(id);
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  el(id).classList.add('active');
+  const hub = el('hub-btn');
+  if (hub) hub.style.display = (id === 'screen-lobby') ? '' : 'none';
+}
+
+function chebyshev(r1,c1,r2,c2) { return Math.max(Math.abs(r1-r2), Math.abs(c1-c2)); }
+
+function getTeam(playerId) {
+  if (!S.gameState) return null;
+  const p = S.gameState.players.find(p => p.id === playerId);
+  return p ? p.team : null;
+}
+
+function isMyPiece(piece) {
+  return piece && piece.team === S.myTeam;
+}
+
+function getCurrentPiece() {
+  if (!S.gameState) return null;
+  const id = S.gameState.currentPieceId;
+  return S.gameState.pieces.find(p => p.id === id);
+}
+
+function isMyTurn() {
+  const cp = getCurrentPiece();
+  return cp && cp.team === S.myTeam;
+}
+
+// ── Lobby ──────────────────────────────────────────────────────
+function buildAvatarGrid() {
+  const grid = el('avatar-grid');
+  AVATARS.forEach(em => {
+    const d = document.createElement('div');
+    d.className = 'avatar-opt' + (em === selectedAvatar ? ' selected' : '');
+    d.textContent = em;
+    d.onclick = () => {
+      document.querySelectorAll('.avatar-opt').forEach(a => a.classList.remove('selected'));
+      d.classList.add('selected');
+      selectedAvatar = em;
+    };
+    grid.appendChild(d);
+  });
+}
+buildAvatarGrid();
+
+el('tab-join').onclick = () => {
+  el('tab-join').classList.add('active'); el('tab-create').classList.remove('active');
+  el('panel-join').style.display=''; el('panel-create').style.display='none';
+};
+el('tab-create').onclick = () => {
+  el('tab-create').classList.add('active'); el('tab-join').classList.remove('active');
+  el('panel-create').style.display=''; el('panel-join').style.display='none';
+};
+
+el('btn-join').onclick = () => {
+  const name = el('inp-name-join').value.trim();
+  const code = el('inp-code').value.trim().toUpperCase();
+  if (!name) return setErr('lobby-error','Entre un pseudo');
+  if (!code) return setErr('lobby-error','Entre un code de room');
+  socket.emit('rb:join', { name, avatar:selectedAvatar, code });
+};
+el('btn-create').onclick = () => {
+  const name = el('inp-name-create').value.trim();
+  if (!name) return setErr('lobby-error','Entre un pseudo');
+  socket.emit('rb:create', { name, avatar:selectedAvatar });
+};
+['inp-name-join','inp-code'].forEach(id => el(id).addEventListener('keydown', e => { if(e.key==='Enter') el('btn-join').click(); }));
+el('inp-name-create').addEventListener('keydown', e => { if(e.key==='Enter') el('btn-create').click(); });
+
+function setErr(id, msg) { el(id).textContent = msg; }
+
+// ── Waiting room ───────────────────────────────────────────────
+function renderWaiting(state) {
+  el('waiting-code').textContent = S.roomCode;
+  const list = el('waiting-players');
+  list.innerHTML = state.players.map(p => `
+    <div class="player-row">
+      <span class="player-avatar">${p.avatar}</span>
+      <span class="player-name">${p.name}</span>
+      <span class="player-team-badge ${p.team === 'blue' ? 'team-blue' : 'team-red'}">${p.team === 'blue' ? '🔵 Bleu' : '🔴 Rouge'}</span>
+    </div>`).join('');
+  const isHost = state.players[0]?.id === S.myId;
+  el('btn-start-draft').style.display = (isHost && state.players.length === 2) ? '' : 'none';
+  el('waiting-for').style.display = state.players.length < 2 ? '' : 'none';
+}
+
+el('btn-start-draft').onclick = () => socket.emit('rb:start_draft');
+
+// ── Draft ──────────────────────────────────────────────────────
+function renderDraft() {
+  const grid = el('draft-grid');
+  grid.innerHTML = '';
+  CHAMPION_LIST.forEach(id => {
+    const c = CHAMPIONS[id];
+    const card = document.createElement('div');
+    card.className = 'champ-card';
+    card.dataset.id = id;
+    card.innerHTML = `
+      <div class="champ-card-emoji">${c.emoji}</div>
+      <div class="champ-card-name">${c.name}</div>
+      <div class="champ-card-class">${c.class}</div>
+      <div class="champ-card-element el-${c.element}">${c.element}</div>`;
+    card.onclick = () => toggleDraftChampion(id);
+    card.onmouseenter = () => showChampDetail(id);
+    grid.appendChild(card);
+  });
+  renderDraftSidebar();
+}
+
+function toggleDraftChampion(id) {
+  const idx = S.selectedChampions.indexOf(id);
+  if (idx >= 0) {
+    S.selectedChampions.splice(idx, 1);
+  } else {
+    if (S.selectedChampions.length >= 5) return;
+    S.selectedChampions.push(id);
+  }
+  // Update card states
+  document.querySelectorAll('.champ-card').forEach(c => {
+    c.classList.toggle('selected', S.selectedChampions.includes(c.dataset.id));
+  });
+  renderDraftSidebar();
+}
+
+function renderDraftSidebar() {
+  const list = el('draft-selected-list');
+  list.innerHTML = S.selectedChampions.map(id => {
+    const c = CHAMPIONS[id];
+    return `<div class="selected-chip" onclick="toggleDraftChampion('${id}')">${c.emoji} ${c.name} ×</div>`;
+  }).join('');
+  el('draft-subtitle').textContent = `Choisissez 5 champions — ${S.selectedChampions.length}/5 sélectionnés`;
+  el('btn-confirm-draft').disabled = S.selectedChampions.length !== 5;
+}
+
+function showChampDetail(id) {
+  const c = CHAMPIONS[id];
+  const panel = el('champ-detail');
+  panel.style.display = '';
+  el('cd-emoji').textContent = c.emoji;
+  el('cd-name').textContent = c.name;
+  el('cd-title').textContent = c.title;
+  el('cd-class').textContent = `${c.class} · ${c.element}`;
+  el('cd-stats').innerHTML = `
+    <div class="stat-item">❤️ PV: <span>${c.stats.hp}</span></div>
+    <div class="stat-item">⚔️ ATK: <span>${c.stats.atk}</span></div>
+    <div class="stat-item">🛡️ ARM: <span>${c.stats.arm}</span></div>
+    <div class="stat-item">✨ RM: <span>${c.stats.rm}</span></div>
+    <div class="stat-item">⚡ SPD: <span>${c.stats.spd}</span></div>
+    <div class="stat-item">🚶 MOVE: <span>${c.stats.move}</span></div>`;
+  el('cd-spells').innerHTML = `
+    <div class="spell-item"><div class="spell-name">Sort 1 — ${c.s1.name}</div><div class="spell-desc">${c.s1.desc}</div></div>
+    <div class="spell-item"><div class="spell-name">Sort 2 — ${c.s2.name}</div><div class="spell-desc">${c.s2.desc}</div></div>
+    <div class="spell-item"><div class="spell-name">✨ Ultim — ${c.u.name}</div><div class="spell-desc">${c.u.desc}</div></div>`;
+}
+
+el('btn-confirm-draft').onclick = () => {
+  if (S.selectedChampions.length === 5) socket.emit('rb:draft', { championIds: S.selectedChampions });
+};
+
+// ── Placement ──────────────────────────────────────────────────
+function renderPlacementScreen(state) {
+  el('placement-subtitle').textContent = `Tour de placement: équipe ${state.placementTeam === S.myTeam ? 'VOTRE' : 'adverse'}`;
+  buildBoard('board-placement', state, 'placement');
+  renderPlacementQueue(state);
+}
+
+function renderPlacementQueue(state) {
+  const queue = el('placement-queue');
+  if (!state) { queue.innerHTML=''; return; }
+  const me = state.players.find(p => p.id === S.myId);
+  if (!me) return;
+  const placed = state.pieces.filter(p => p.team === S.myTeam).map(p => p.championId);
+  queue.innerHTML = me.chosenChampions.map(id => {
+    const c = CHAMPIONS[id];
+    const isPlaced = placed.includes(id);
+    const isActive = S.placingChampionId === id && state.placementTeam === S.myTeam;
+    return `<div class="pq-item ${isActive?'active-place':''} ${isPlaced?'placed':''}" onclick="selectForPlacement('${id}')">
+      <span class="pq-emoji">${c.emoji}</span>
+      <span class="pq-name">${c.name}</span>
+      ${isPlaced?'<span style="font-size:0.65rem;color:var(--green)">✓</span>':''}
+    </div>`;
+  }).join('');
+}
+
+function selectForPlacement(id) {
+  if (!S.gameState || S.gameState.placementTeam !== S.myTeam) return;
+  const placed = S.gameState.pieces.filter(p => p.team === S.myTeam).map(p => p.championId);
+  if (placed.includes(id)) return;
+  S.placingChampionId = id;
+  renderPlacementScreen(S.gameState);
+  buildBoard('board-placement', S.gameState, 'placement');
+}
+
+// ── Board rendering ────────────────────────────────────────────
+function buildBoard(boardId, state, mode = 'game') {
+  const board = el(boardId);
+  board.innerHTML = '';
+
+  const ROWS = 9, COLS = 13;
+  const terrain = state.terrain;
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.createElement('div');
+      const t = getCellTerrain(state, r, c);
+      cell.className = `cell ${TERRAIN_COLORS[t] || 'cell-lane'}`;
+      cell.dataset.row = r; cell.dataset.col = c;
+
+      // Terrain emoji accent
+      if (t === 'river') cell.innerHTML = '<span class="river-wave" style="opacity:0.15">〰</span>';
+      if (t === 'jungle') cell.innerHTML = '<span style="font-size:0.5rem;opacity:0.2;position:absolute;bottom:1px;right:1px">🌿</span>';
+
+      // Wall overlay
+      const wall = state.walls?.find(w => w.r === r && w.c === c);
+      if (wall) {
+        cell.classList.add('cell-wall');
+        cell.innerHTML = '<div class="wall-obj">🧱</div>';
+      }
+
+      // Trail overlay
+      const trail = state.trails?.find(tr => tr.r === r && tr.c === c);
+      if (trail) {
+        cell.style.boxShadow = 'inset 0 0 8px rgba(200,200,0,0.3)';
+      }
+
+      // Fountain
+      const fountain = getFountainAt(state, r, c);
+      if (fountain) {
+        const pct = fountain.maxHp > 0 ? (fountain.hp / fountain.maxHp) * 100 : 0;
+        const fillClass = pct > 60 ? 'high' : pct > 25 ? 'medium' : 'low';
+        const dead = fountain.hp <= 0;
+        cell.innerHTML = `
+          <div class="fountain-obj fountain-${fountain.team} ${dead?'fountain-destroyed':''}">
+            <span>${fountain.team==='blue'?'🏰':'⚔️'}</span>
+            <div class="fountain-hp-bar"><div class="fountain-hp-fill ${fillClass}" style="width:${pct}%"></div></div>
+          </div>`;
+      }
+
+      // Trap (only show own traps)
+      const trap = state.traps?.find(tr => tr.r === r && tr.c === c && tr.team === S.myTeam);
+      if (trap) {
+        const trapEl = document.createElement('div');
+        trapEl.className = 'trap-obj';
+        trapEl.style.cssText = 'position:absolute;inset:30%';
+        cell.appendChild(trapEl);
+      }
+
+      // Piece
+      const piece = state.pieces.find(p => p.row === r && p.col === c);
+      if (piece) {
+        const champDef = CHAMPIONS[piece.championId] || {};
+        const pct = piece.maxHp > 0 ? (piece.hp / piece.maxHp) * 100 : 0;
+        const fillClass = pct > 60 ? 'full' : pct > 25 ? 'medium' : 'low';
+        const isCurrent = state.currentPieceId === piece.id;
+        const isActive = S.activePieceId === piece.id;
+        const isShadow = piece.championId === 'shadow';
+
+        const pieceEl = document.createElement('div');
+        pieceEl.className = `piece piece-${piece.team} ${isCurrent&&isMyTurn()?'piece-active':''} ${!piece.alive?'piece-dead':''} ${isShadow?'piece-shadow':''}`;
+        pieceEl.dataset.pieceId = piece.id;
+
+        const statuses = piece.statuses || [];
+        const statusIcons = statuses.slice(0,4).map(s => `<span class="status-icon">${STATUS_ICONS[s.name]||'?'}</span>`).join('');
+
+        pieceEl.innerHTML = `
+          <div class="piece-statuses">${statusIcons}</div>
+          <div class="piece-emoji">${champDef.emoji || '❓'}</div>
+          <div class="piece-hp-bar"><div class="piece-hp-fill ${fillClass}" style="width:${pct}%"></div></div>`;
+
+        pieceEl.addEventListener('click', (e) => { e.stopPropagation(); onPieceClick(piece, cell, r, c, mode); });
+        pieceEl.addEventListener('mouseenter', () => showHoveredPiece(piece));
+        pieceEl.addEventListener('mouseleave', () => hideHoveredPiece());
+        cell.appendChild(pieceEl);
+      }
+
+      // Click handler for board
+      cell.addEventListener('click', () => onCellClick(r, c, mode));
+
+      board.appendChild(cell);
+    }
+  }
+}
+
+function getCellTerrain(state, r, c) {
+  // Check fountain cells first
+  const allFountains = [...(state.fountains||[])];
+  if (allFountains.find(f => f.row===r && f.col===c)) return 'fountain';
+  return state.terrain?.[r]?.[c] || 'lane';
+}
+
+function getFountainAt(state, r, c) {
+  return (state.fountains||[]).find(f => f.row===r && f.col===c);
+}
+
+function getCellEl(boardId, r, c) {
+  const board = el(boardId);
+  const idx = r * 13 + c;
+  return board.children[idx];
+}
+
+// ── Highlights ──────────────────────────────────────────────────
+function clearHighlights(boardId) {
+  document.querySelectorAll(`#${boardId} .cell`).forEach(c => {
+    c.classList.remove('highlight-move','highlight-attack','highlight-spell','highlight-place','selected-cell');
+  });
+}
+
+function highlightCells(boardId, cells, type) {
+  cells.forEach(([r,c]) => {
+    const cellEl = getCellEl(boardId, r, c);
+    if (cellEl) cellEl.classList.add(`highlight-${type}`);
+  });
+}
+
+// ── Piece interaction ──────────────────────────────────────────
+function onPieceClick(piece, cellEl, r, c, mode) {
+  if (mode === 'placement') {
+    if (S.placingChampionId) onCellClick(r, c, mode);
+    return;
+  }
+  if (mode !== 'game') return;
+  if (!isMyTurn()) return;
+
+  const cp = getCurrentPiece();
+  if (!cp) return;
+
+  // If it's not my active piece being clicked, check if it's an attack target
+  if (piece.id === cp.id) {
+    // Select my active piece again → show actions
+    S.activePieceId = piece.id;
+    renderActionPanel(cp);
+    clearHighlights('board-game');
+    S.selectedAction = null;
+    return;
+  }
+
+  // If we have an action selected (attack/spell), this is the target
+  if (S.selectedAction === 'attack' && piece.team !== S.myTeam && piece.alive) {
+    socket.emit('rb:attack', { pieceId: cp.id, targetRow: r, targetCol: c });
+    S.selectedAction = null;
+    clearHighlights('board-game');
+    return;
+  }
+  if (['s1','s2','ultim'].includes(S.selectedAction) && piece.alive) {
+    socket.emit('rb:spell', { pieceId: cp.id, spellKey: S.selectedAction, targetRow: r, targetCol: c });
+    S.selectedAction = null;
+    clearHighlights('board-game');
+    return;
+  }
+  if (S.selectedAction === 'ultim' && !piece.alive && piece.team === S.myTeam) {
+    // Aelys resurrection targets dead ally
+    socket.emit('rb:spell', { pieceId: cp.id, spellKey: 'ultim', targetRow: r, targetCol: c });
+    S.selectedAction = null;
+    clearHighlights('board-game');
+    return;
+  }
+}
+
+function onCellClick(r, c, mode) {
+  if (mode === 'placement') {
+    if (!S.placingChampionId) return;
+    if (!S.gameState || S.gameState.placementTeam !== S.myTeam) return;
+    socket.emit('rb:place', { championId: S.placingChampionId, row: r, col: c });
+    return;
+  }
+
+  if (mode !== 'game') return;
+  if (!isMyTurn()) return;
+
+  const cp = getCurrentPiece();
+  if (!cp) return;
+
+  const cellEl = getCellEl('board-game', r, c);
+
+  if (S.selectedAction === 'move' && cellEl?.classList.contains('highlight-move')) {
+    socket.emit('rb:move', { pieceId: cp.id, row: r, col: c });
+    S.selectedAction = null;
+    clearHighlights('board-game');
+    return;
+  }
+
+  if (S.selectedAction === 'attack' && cellEl?.classList.contains('highlight-attack')) {
+    // Could be a fountain or empty cell (for AoE spells)
+    const fountain = getFountainAt(S.gameState, r, c);
+    if (fountain && fountain.team !== S.myTeam) {
+      socket.emit('rb:attack', { pieceId: cp.id, targetRow: r, targetCol: c });
+      S.selectedAction = null;
+      clearHighlights('board-game');
+    }
+    return;
+  }
+
+  if (['s1','s2','ultim'].includes(S.selectedAction) && cellEl?.classList.contains('highlight-spell')) {
+    socket.emit('rb:spell', { pieceId: cp.id, spellKey: S.selectedAction, targetRow: r, targetCol: c });
+    S.selectedAction = null;
+    clearHighlights('board-game');
+    return;
+  }
+
+  // Click elsewhere → deselect action
+  if (S.selectedAction) {
+    S.selectedAction = null;
+    clearHighlights('board-game');
+  }
+}
+
+// ── Action panel ───────────────────────────────────────────────
+function renderActionPanel(piece) {
+  if (!piece) { el('active-piece-panel').style.display='none'; return; }
+  el('active-piece-panel').style.display = '';
+
+  const champDef = CHAMPIONS[piece.championId] || {};
+  const pct = piece.maxHp > 0 ? (piece.hp/piece.maxHp*100) : 0;
+  const fillClass = pct > 60 ? 'full' : pct > 25 ? 'medium' : 'low';
+  const colorMap = {'full':'var(--green)','medium':'#ffa502','low':'var(--red2)'};
+
+  const statuses = (piece.statuses||[]).map(s =>
+    `<span class="status-badge status-${s.name}">${STATUS_ICONS[s.name]||'?'} ${s.name} (${s.duration}t)</span>`
+  ).join('');
+
+  el('active-piece-info').innerHTML = `
+    <div class="active-piece-card">
+      <div class="apc-header">
+        <span class="apc-emoji">${champDef.emoji||'?'}</span>
+        <div>
+          <div class="apc-name">${champDef.name||piece.championId}</div>
+          <div class="apc-class">${champDef.class||''} · ${champDef.element||''}</div>
+        </div>
+      </div>
+      <div class="apc-hp-bar"><div class="apc-hp-fill ${fillClass}" style="width:${pct}%;background:${colorMap[fillClass]}"></div></div>
+      <div class="apc-stats-row">
+        <span>❤️ ${piece.hp}/${piece.maxHp}</span>
+        <span>⚔️ ${piece.atk}</span>
+        <span>🛡️ ${piece.arm}</span>
+        <span>✨ ${piece.rm}</span>
+      </div>
+      <div class="apc-statuses">${statuses}</div>
+    </div>`;
+
+  // Action buttons
+  const acted = piece.actedThisTurn || {};
+  const cds = piece.spellCooldowns || {};
+  const isStunned = (piece.statuses||[]).some(s => s.name === 'étourdi');
+  const isAnchor = piece.isAnchor;
+
+  el('act-move').className = `act-btn ${acted.moved||isAnchor||isStunned?'done':''}`;
+  el('act-attack').className = `act-btn ${acted.attacked||isStunned?'done':''}`;
+  el('act-end').className = 'act-btn btn-end-turn';
+
+  // Spell buttons
+  const spells = [
+    { key:'s1', def:champDef.s1, cd:cds.s1||0 },
+    { key:'s2', def:champDef.s2, cd:cds.s2||0 },
+    { key:'ultim', def:champDef.u, cd:cds.ultim||0 },
+  ];
+  spells.forEach(sp => {
+    const btn = el(`act-${sp.key==='ultim'?'ultim':sp.key}`);
+    if (!btn) return;
+    const onCd = sp.cd > 0;
+    const done = acted.spelled || isStunned;
+    btn.className = `act-btn ${done||onCd?'done':''}`;
+    btn.innerHTML = `${sp.key==='ultim'?'✨ Ultim':sp.key==='s1'?'🔮 Sort 1':'💫 Sort 2'}<br><span class="spell-cd">${sp.def?.name||''} ${onCd?`(${sp.cd} tours)`:''}</span>`;
+  });
+}
+
+// ── Hovered piece info ─────────────────────────────────────────
+function showHoveredPiece(piece) {
+  const champDef = CHAMPIONS[piece.championId] || {};
+  el('hovered-piece-panel').style.display = '';
+  const pct = piece.maxHp > 0 ? (piece.hp/piece.maxHp*100) : 0;
+  el('hovered-piece-info').innerHTML = `
+    <div class="hover-piece-card">
+      <div class="hpc-header">
+        <span class="hpc-emoji">${champDef.emoji||'?'}</span>
+        <div>
+          <div class="hpc-name">${champDef.name||piece.championId}</div>
+          <div class="hpc-hp">❤️ ${piece.hp}/${piece.maxHp}</div>
+        </div>
+      </div>
+      <div class="hpc-stats">
+        <div class="hpc-stat">⚔️ <span>${piece.atk}</span></div>
+        <div class="hpc-stat">🛡️ <span>${piece.arm}</span></div>
+        <div class="hpc-stat">✨ <span>${piece.rm}</span></div>
+        <div class="hpc-stat">⚡ <span>${piece.spd}</span></div>
+        <div class="hpc-stat">🚶 <span>${piece.move}</span></div>
+      </div>
+    </div>`;
+}
+function hideHoveredPiece() {
+  el('hovered-piece-panel').style.display = 'none';
+}
+
+// ── Turn order bar ─────────────────────────────────────────────
+function renderTurnOrderBar(state) {
+  const bar = el('turn-order-bar');
+  if (!bar || !state.turnOrder) return;
+  bar.innerHTML = state.turnOrder.map(id => {
+    const p = state.pieces.find(p => p.id === id);
+    if (!p) return '';
+    const champDef = CHAMPIONS[p.championId] || {};
+    const isCurrent = id === state.currentPieceId;
+    return `<div class="turn-chip ${p.team}-piece ${isCurrent?'active-turn':''} ${!p.alive?'dead-piece':''}" title="${champDef.name||id}">${champDef.emoji||'?'}</div>`;
+  }).join('');
+}
+
+// ── Fountain status panel ──────────────────────────────────────
+function renderFountainPanel(state) {
+  const panel = el('fountain-status');
+  if (!panel || !state.fountains) return;
+  panel.innerHTML = state.fountains.map(f => {
+    const pct = f.maxHp > 0 ? (f.hp/f.maxHp*100) : 0;
+    const fillColor = pct > 60 ? 'var(--green)' : pct > 25 ? '#ffa502' : 'var(--red2)';
+    const dead = f.hp <= 0;
+    const label = f.id.includes('center') ? 'Centre' : f.id.includes('left') ? 'Gauche' : 'Droite';
+    return `<div class="fountain-row ${dead?'fountain-dead':''}">
+      <span class="fountain-icon">${f.team==='blue'?'🔵':'🔴'}</span>
+      <span style="font-size:0.7rem;min-width:50px">${label}</span>
+      <div class="fountain-bar-wrap"><div class="fountain-bar-fill" style="width:${pct}%;background:${fillColor}"></div></div>
+      <span class="fountain-hp-text">${dead?'💥':f.hp}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Log ───────────────────────────────────────────────────────
+function renderLog(state) {
+  const log = el('game-log');
+  if (!log || !state.log) return;
+  log.innerHTML = [...state.log].reverse().map(entry => {
+    let cls = 'log-entry';
+    if (entry.includes('dégâts') || entry.includes('touche')) cls += ' log-damage';
+    else if (entry.includes('soigné') || entry.includes('PV')) cls += ' log-heal';
+    else if (entry.includes('éliminé') || entry.includes('détruit')) cls += ' log-death';
+    else if (entry.includes('Tour ') || entry.includes('round')) cls += ' log-turn';
+    else if (entry.includes('Sort') || entry.includes('Ultim') || entry.includes('lance')) cls += ' log-spell';
+    else if (entry.includes('déplace') || entry.includes('vers')) cls += ' log-move';
+    return `<div class="${cls}">${entry}</div>`;
+  }).join('');
+}
+
+// ── Action button handlers ─────────────────────────────────────
+function setupActionButtons() {
+  el('act-move').onclick = () => {
+    const cp = getCurrentPiece();
+    if (!cp || cp.actedThisTurn?.moved || isAnchorOrStunned(cp)) return;
+    S.selectedAction = S.selectedAction === 'move' ? null : 'move';
+    if (S.selectedAction === 'move') {
+      clearHighlights('board-game');
+      showMoveHighlights(cp);
+    } else {
+      clearHighlights('board-game');
+    }
+    updateActionBtnStates();
+  };
+
+  el('act-attack').onclick = () => {
+    const cp = getCurrentPiece();
+    if (!cp || cp.actedThisTurn?.attacked || isStunned(cp)) return;
+    S.selectedAction = S.selectedAction === 'attack' ? null : 'attack';
+    if (S.selectedAction === 'attack') {
+      clearHighlights('board-game');
+      showAttackHighlights(cp);
+    } else {
+      clearHighlights('board-game');
+    }
+    updateActionBtnStates();
+  };
+
+  ['s1','s2','ultim'].forEach(key => {
+    const btnId = key === 'ultim' ? 'act-ultim' : `act-${key}`;
+    el(btnId).onclick = () => {
+      const cp = getCurrentPiece();
+      if (!cp || cp.actedThisTurn?.spelled || isStunned(cp)) return;
+      const cd = cp.spellCooldowns?.[key] || 0;
+      if (cd > 0) return;
+      S.selectedAction = S.selectedAction === key ? null : key;
+      if (S.selectedAction === key) {
+        clearHighlights('board-game');
+        showSpellHighlights(cp, key);
+      } else {
+        clearHighlights('board-game');
+      }
+      updateActionBtnStates();
+    };
+  });
+
+  el('act-end').onclick = () => {
+    const cp = getCurrentPiece();
+    if (!cp) return;
+    S.selectedAction = null;
+    clearHighlights('board-game');
+    socket.emit('rb:end_turn', { pieceId: cp.id });
+  };
+}
+setupActionButtons();
+
+function isAnchorOrStunned(piece) {
+  return piece.isAnchor || isStunned(piece);
+}
+function isStunned(piece) {
+  return (piece.statuses||[]).some(s => s.name === 'étourdi');
+}
+
+function updateActionBtnStates() {
+  ['move','attack','s1','s2','ultim'].forEach(a => {
+    const btnId = a === 'ultim' ? 'act-ultim' : `act-${a}`;
+    const btn = el(btnId);
+    if (!btn) return;
+    btn.classList.toggle('active', S.selectedAction === a);
+  });
+}
+
+// ── Move highlights ────────────────────────────────────────────
+function showMoveHighlights(piece) {
+  if (!S.gameState) return;
+  // Simple: Chebyshev distance up to moveRange, not on obstacle/piece/river
+  const cells = getClientReachable(piece, S.gameState);
+  highlightCells('board-game', cells, 'move');
+}
+
+function getClientReachable(piece, state) {
+  const move = getEffectiveMove(piece, state);
+  const occupied = new Set(state.pieces.filter(p => p.alive && p.id !== piece.id).map(p => `${p.row},${p.col}`));
+  const fountainCells = new Set((state.fountains||[]).map(f => `${f.row},${f.col}`));
+  const walls = new Set((state.walls||[]).map(w => `${w.r},${w.c}`));
+
+  const reachable = [];
+  // BFS
+  const dist = {[`${piece.row},${piece.col}`]: 0};
+  const queue = [[piece.row, piece.col]];
+
+  while (queue.length) {
+    const [r,c] = queue.shift();
+    const d = dist[`${r},${c}`];
+    if (d >= move) continue;
+
+    for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]]) {
+      const nr=r+dr, nc=c+dc;
+      const key=`${nr},${nc}`;
+      if (key in dist) continue;
+      if (nr<0||nr>=9||nc<0||nc>=13) continue;
+      const t = getCellTerrain(state, nr, nc);
+      if (t === 'river') continue;
+      if (walls.has(key)) continue;
+
+      const hasEnemy = occupied.has(key) && state.pieces.find(p=>p.row===nr&&p.col===nc&&p.team!==piece.team&&p.alive);
+      if (hasEnemy) continue; // blocked by enemy
+
+      dist[key] = d + 1;
+      if (!occupied.has(key) && !fountainCells.has(key) && t !== 'fountain') {
+        reachable.push([nr, nc]);
+      }
+      queue.push([nr, nc]);
+    }
+  }
+  return reachable;
+}
+
+function getEffectiveMove(piece, state) {
+  let m = piece.move;
+  const statuses = piece.statuses || [];
+  if (statuses.some(s => s.name === 'immobilisé')) return 0;
+  if (statuses.some(s => s.name === 'étourdi')) return 0;
+  if (piece.isAnchor) return 0;
+  if (statuses.some(s => s.name === 'ralenti')) m--;
+  if (statuses.some(s => s.name === 'gelé')) m--;
+  return Math.max(1, m);
+}
+
+// ── Attack highlights ──────────────────────────────────────────
+function showAttackHighlights(piece) {
+  if (!S.gameState) return;
+  const cells = [];
+
+  // Enemy pieces in atkRange
+  S.gameState.pieces.forEach(p => {
+    if (!p.alive || p.team === piece.team) return;
+    if (chebyshev(piece.row,piece.col,p.row,p.col) <= piece.atkRange) {
+      cells.push([p.row, p.col]);
+    }
+  });
+
+  // Enemy fountains in atkRange
+  (S.gameState.fountains||[]).forEach(f => {
+    if (f.team === piece.team || f.hp <= 0) return;
+    if (chebyshev(piece.row,piece.col,f.row,f.col) <= piece.atkRange) {
+      cells.push([f.row, f.col]);
+    }
+  });
+
+  highlightCells('board-game', cells, 'attack');
+}
+
+// ── Spell highlights (simplified) ─────────────────────────────
+function showSpellHighlights(piece, spellKey) {
+  if (!S.gameState) return;
+  const champId = piece.championId;
+  const cells = [];
+
+  // Simplified: for each champion/spell, generate target highlights based on targeting type
+  const spellTargeting = getSpellTargeting(champId, spellKey);
+
+  if (spellTargeting === 'line' || spellTargeting === 'full_row') {
+    const range = getSpellRange(champId, spellKey);
+    // Highlight all cells within range in 4 or 8 directions
+    const dirs = spellTargeting === 'full_row'
+      ? [[0,-1],[0,1]]
+      : [[-1,0],[1,0],[0,-1],[0,1]];
+    dirs.forEach(([dr,dc]) => {
+      for (let i=1; i<=range; i++) {
+        const nr=piece.row+dr*i, nc=piece.col+dc*i;
+        if (nr<0||nr>=9||nc<0||nc>=13) break;
+        cells.push([nr,nc]);
+        const hasPiece = S.gameState.pieces.find(p=>p.row===nr&&p.col===nc&&p.alive);
+        if (hasPiece) break; // line stops at first target
+      }
+    });
+  } else if (spellTargeting === 'all_diag') {
+    const range = getSpellRange(champId, spellKey);
+    [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
+      for (let i=1; i<=range; i++) {
+        const nr=piece.row+dr*i, nc=piece.col+dc*i;
+        if (nr<0||nr>=9||nc<0||nc>=13) break;
+        cells.push([nr,nc]);
+      }
+    });
+  } else if (spellTargeting === 'diag_jump') {
+    const range = getSpellRange(champId, spellKey);
+    const minR = getSpellMinRange(champId, spellKey);
+    [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
+      for (let i=(minR||1); i<=range; i++) {
+        const nr=piece.row+dr*i, nc=piece.col+dc*i;
+        if (nr<0||nr>=9||nc<0||nc>=13) break;
+        cells.push([nr,nc]);
+      }
+    });
+  } else if (spellTargeting === 'adjacent' || spellTargeting === 'front_arc') {
+    [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
+      const nr=piece.row+dr, nc=piece.col+dc;
+      if (nr>=0&&nr<9&&nc>=0&&nc<13) cells.push([nr,nc]);
+    });
+  } else if (spellTargeting === 'single' || spellTargeting === 'dead_ally') {
+    const range = getSpellRange(champId, spellKey);
+    S.gameState.pieces.forEach(p => {
+      if (!p.alive && spellTargeting==='dead_ally' && p.team===piece.team) cells.push([p.row,p.col]);
+      else if (p.alive && spellTargeting==='single' && chebyshev(piece.row,piece.col,p.row,p.col)<=range) cells.push([p.row,p.col]);
+    });
+  } else if (spellTargeting === 'self' || spellTargeting === 'aoe_self') {
+    // Target self — immediate activation
+    cells.push([piece.row, piece.col]);
+  } else if (spellTargeting === 'shadow') {
+    // Syal swap with shadow
+    const shadow = S.gameState.pieces.find(p => p.id.includes('shadow') && p.team === piece.team && p.alive);
+    if (shadow) cells.push([shadow.row, shadow.col]);
+  } else if (spellTargeting === 'two_diag_place') {
+    const range = getSpellRange(champId, spellKey);
+    [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
+      for (let i=1; i<=range; i++) {
+        const nr=piece.row+dr*i, nc=piece.col+dc*i;
+        if (nr>=0&&nr<9&&nc>=0&&nc<13) cells.push([nr,nc]);
+      }
+    });
+  } else {
+    // Default: all cells in range
+    const range = getSpellRange(champId, spellKey);
+    for (let dr=-range; dr<=range; dr++) {
+      for (let dc=-range; dc<=range; dc++) {
+        if (dr===0&&dc===0) continue;
+        const nr=piece.row+dr, nc=piece.col+dc;
+        if (nr>=0&&nr<9&&nc>=0&&nc<13) cells.push([nr,nc]);
+      }
+    }
+  }
+
+  highlightCells('board-game', cells, 'spell');
+}
+
+function getSpellTargeting(champId, spellKey) {
+  const spellMap = {
+    karek:  {s1:'line', s2:'front_arc', ultim:'self'},
+    lysha:  {s1:'diag_jump', s2:'all_diag', ultim:'adjacent'},
+    syal:   {s1:'adjacent', s2:'shadow', ultim:'single'},
+    velara: {s1:'full_row', s2:'aoe_self', ultim:'line'},
+    pyrox:  {s1:'line', s2:'all_diag', ultim:'self'},
+    gorath: {s1:'adjacent', s2:'self', ultim:'self'},
+    aelys:  {s1:'line', s2:'all_diag', ultim:'dead_ally'},
+    rohn:   {s1:'line', s2:'two_diag_place', ultim:'single'},
+    vek:    {s1:'adjacent', s2:'front_arc', ultim:'self'},
+    zhen:   {s1:'line', s2:'diag_jump', ultim:'self'},
+  };
+  return spellMap[champId]?.[spellKey] || 'single';
+}
+function getSpellRange(champId, spellKey) {
+  const rangeMap = {
+    karek:{s1:4,s2:2,ultim:0}, lysha:{s1:3,s2:2,ultim:1},
+    syal:{s1:1,s2:99,ultim:4}, velara:{s1:12,s2:3,ultim:5},
+    pyrox:{s1:6,s2:4,ultim:3}, gorath:{s1:2,s2:2,ultim:0},
+    aelys:{s1:3,s2:2,ultim:99}, rohn:{s1:7,s2:3,ultim:99},
+    vek:{s1:1,s2:1,ultim:0}, zhen:{s1:5,s2:3,ultim:4},
+  };
+  return rangeMap[champId]?.[spellKey] || 3;
+}
+function getSpellMinRange(champId, spellKey) {
+  if (champId==='lysha'&&spellKey==='s1') return 2;
+  return 1;
+}
+
+// ── Full game state render ─────────────────────────────────────
+function renderGame(state) {
+  if (!state) return;
+  S.gameState = state;
+
+  const boardId = state.phase === 'placement' ? 'board-placement' : 'board-game';
+
+  if (state.phase === 'placement') {
+    buildBoard('board-placement', state, 'placement');
+    renderPlacementQueue(state);
+    renderPlacementScreen(state);
+    return;
+  }
+
+  if (state.phase !== 'playing' && state.phase !== 'finished') return;
+
+  buildBoard('board-game', state, 'game');
+  renderTurnOrderBar(state);
+  renderFountainPanel(state);
+  renderLog(state);
+
+  el('game-round').textContent = `Tour ${state.round}`;
+
+  const cp = getCurrentPiece();
+  const myTurn = cp && cp.team === S.myTeam;
+
+  if (myTurn && cp.id !== S.activePieceId) {
+    S.activePieceId = cp.id;
+    S.selectedAction = null;
+    clearHighlights('board-game');
+  }
+
+  if (myTurn) {
+    renderActionPanel(cp);
+    el('active-piece-panel').style.display = '';
+    el('game-phase-label').textContent = `Votre tour — ${CHAMPIONS[cp?.championId]?.name || ''}`;
+    el('game-phase-label').style.color = 'var(--gold)';
+  } else {
+    el('active-piece-panel').style.display = 'none';
+    el('game-phase-label').textContent = `Tour adverse — ${CHAMPIONS[cp?.championId]?.name || ''}`;
+    el('game-phase-label').style.color = 'var(--text2)';
+  }
+}
+
+// ── Finished screen ────────────────────────────────────────────
+function renderFinished(state) {
+  const myTeamWon = state.winner === S.myTeam;
+  el('fin-title').textContent = myTeamWon ? '🏆 Victoire !' : '💀 Défaite';
+  el('fin-title').style.color = myTeamWon ? 'var(--gold)' : 'var(--red2)';
+  el('fin-sub').textContent = `L'équipe ${state.winner === 'blue' ? 'bleue' : 'rouge'} a remporté la partie !`;
+  el('btn-quit-fin').onclick = () => location.reload();
+  showScreen('screen-finished');
+}
+
+// ── Surrender ──────────────────────────────────────────────────
+el('btn-surrender')?.addEventListener('click', () => {
+  if (confirm('Abandonner la partie ?')) socket.emit('rb:surrender');
+});
+
+// ── Socket events ──────────────────────────────────────────────
+socket.on('rb:created', ({ roomCode, state }) => {
+  S.myId = socket.id;
+  S.roomCode = roomCode;
+  S.myTeam = state.players.find(p => p.id === S.myId)?.team || 'blue';
+  showScreen('screen-waiting');
+  renderWaiting(state);
+});
+
+socket.on('rb:joined', ({ roomCode, state }) => {
+  S.myId = socket.id;
+  S.roomCode = roomCode;
+  S.myTeam = state.players.find(p => p.id === S.myId)?.team || 'red';
+  showScreen('screen-waiting');
+  renderWaiting(state);
+});
+
+socket.on('rb:state', (state) => {
+  S.gameState = state;
+  S.myTeam = state.players.find(p => p.id === S.myId)?.team || S.myTeam;
+
+  if (state.phase === 'lobby' || state.phase === 'draft' && !el('screen-draft').classList.contains('active')) {
+    if (state.phase === 'lobby') {
+      renderWaiting(state);
+      showScreen('screen-waiting');
+    }
+  }
+
+  if (state.phase === 'draft') {
+    if (!el('screen-draft').classList.contains('active')) {
+      renderDraft();
+      showScreen('screen-draft');
+    }
+    el('draft-subtitle').textContent = `Choisissez 5 champions — ${S.selectedChampions.length}/5 sélectionnés`;
+  }
+
+  if (state.phase === 'placement') {
+    if (!el('screen-placement').classList.contains('active')) {
+      showScreen('screen-placement');
+      const me = state.players.find(p => p.id === S.myId);
+      if (me && me.chosenChampions?.length) {
+        S.placingChampionId = null;
+      }
+    }
+    renderGame(state);
+  }
+
+  if (state.phase === 'playing') {
+    if (!el('screen-game').classList.contains('active')) {
+      showScreen('screen-game');
+    }
+    renderGame(state);
+  }
+
+  if (state.phase === 'finished') {
+    renderFinished(state);
+  }
+});
+
+socket.on('rb:error', ({ message }) => {
+  const screens = ['lobby-error','waiting-error'];
+  let shown = false;
+  for (const id of screens) {
+    const e = el(id);
+    if (e && e.closest('.screen.active')) {
+      e.textContent = message;
+      shown = true;
+      break;
+    }
+  }
+  if (!shown) alert(message);
+});
+
+socket.on('rb:player_left', ({ message }) => {
+  alert(message || 'Un joueur a quitté la partie.');
+});
+
+socket.on('disconnect', () => {
+  if (!el('screen-lobby').classList.contains('active')) {
+    alert('Connexion perdue. Rafraîchis la page.');
+  }
+});
+

@@ -218,7 +218,7 @@ function showQuestion(data) {
     const btn = document.createElement('button');
     btn.className = 'flag-btn';
     btn.dataset.code = opt.code;
-    btn.innerHTML = `<img src="${flagUrl(opt.code)}" alt="${opt.name}" loading="lazy"/>`;
+    btn.innerHTML = `<img src="${flagUrl(opt.code)}" alt="${opt.name}"/>`;
     btn.addEventListener('click', () => onFlagClick(opt.code, btn));
     grid.appendChild(btn);
   });
@@ -229,14 +229,23 @@ function showQuestion(data) {
   // Alive strip (deathrun)
   renderAliveStrip(alivePlayers);
 
+  // Stop button (host only)
+  el('btn-stop-question').style.display = state.isHost ? '' : 'none';
+
   showScreen('screen-question');
 }
 
 function onFlagClick(code, btn) {
   if (state.hasAnswered) return;
   state.hasAnswered = true;
-  btn.classList.add('selected');
   socket.emit('fg:answer', { code });
+
+  // Instant visual feedback — no need to wait for server
+  const correctCode = state.currentQuestion?.correctCode;
+  document.querySelectorAll('.flag-btn').forEach(b => {
+    if (b.dataset.code === correctCode) b.classList.add('correct');
+    else if (b.dataset.code === code)   b.classList.add('wrong');
+  });
 }
 
 function updateTimerBar(remaining, max) {
@@ -281,54 +290,45 @@ function renderAliveStrip(aliveIds) {
 // ── Round result ───────────────────────────────────────────────
 function showRoundResult(data) {
   clearInterval(timerInterval);
-  const { correctCode, answers, eliminated, alive, players, winner, allOut } = data;
+  const { correctCode, answers, eliminated, alive, players } = data;
 
-  // Flash correct/wrong on flag buttons before transitioning
-  document.querySelectorAll('.flag-btn').forEach(btn => {
-    const code = btn.dataset.code;
-    if (code === correctCode) btn.classList.add('correct');
-    else if (btn.classList.contains('selected')) btn.classList.add('wrong');
+  // Update score (marathon: score vient du serveur via publicPlayers)
+  // Pour deathrun le score est déjà mis à jour côté serveur
+
+  // Mettre à jour le score local depuis les données joueur
+  const me = players.find(p => p.id === state.myId);
+  if (me) state.myScore = me.score;
+
+  el('res-country').textContent = state.currentQuestion?.countryName || '';
+  el('res-flag').src = flagUrl(correctCode);
+  el('res-flag').alt = correctCode;
+
+  // Player rows
+  const rows = el('res-players');
+  rows.innerHTML = '';
+  players.forEach(p => {
+    const ans = answers[p.id];
+    const isCorrect = ans?.correct;
+    const isElim = eliminated.includes(p.id);
+    let cls = 'result-player-row';
+    if (isCorrect)       cls += ' correct-ans';
+    else if (ans?.code)  cls += ' wrong-ans';
+    else                 cls += ' no-ans';
+    rows.innerHTML += `
+      <div class="${cls}">
+        <span style="font-size:1.3rem">${p.avatar}</span>
+        <span style="flex:1;font-weight:700">${p.name}</span>
+        <span>${isCorrect ? '✅' : (ans?.code ? '❌' : '⏱️')}</span>
+        ${state.mode === 'marathon' ? `<span style="color:var(--cyan);font-weight:800;margin-left:8px">${p.score} pts</span>` : ''}
+        ${isElim ? '<span class="result-elim-badge">Éliminé</span>' : ''}
+      </div>`;
   });
 
-  // Update score
-  const myAns = answers[state.myId];
-  if (myAns?.correct) state.myScore++;
+  el('btn-next').style.display        = state.isHost ? '' : 'none';
+  el('btn-stop-result').style.display = state.isHost ? '' : 'none';
+  el('res-wait').style.display        = state.isHost ? 'none' : '';
 
-  setTimeout(() => {
-    // If deathrun and there's a winner/allOut, let fg:game_end handle it
-    if (winner || allOut) return;
-
-    el('res-country').textContent = state.currentQuestion?.countryName || '';
-    el('res-flag').src = flagUrl(correctCode);
-    el('res-flag').alt = correctCode;
-
-    // Player rows
-    const rows = el('res-players');
-    rows.innerHTML = '';
-    players.forEach(p => {
-      const ans = answers[p.id];
-      const isCorrect = ans?.correct;
-      const isElim = eliminated.includes(p.id);
-      let cls = 'result-player-row';
-      if (isCorrect)       cls += ' correct-ans';
-      else if (ans?.code)  cls += ' wrong-ans';
-      else                 cls += ' no-ans';
-      rows.innerHTML += `
-        <div class="${cls}">
-          <span style="font-size:1.3rem">${p.avatar}</span>
-          <span style="flex:1;font-weight:700">${p.name}</span>
-          <span>${isCorrect ? '✅' : (ans?.code ? '❌' : '⏱️')}</span>
-          ${state.mode === 'marathon' ? `<span style="color:var(--cyan);font-weight:800;margin-left:8px">${p.score} pts</span>` : ''}
-          ${isElim ? '<span class="result-elim-badge">Éliminé</span>' : ''}
-        </div>`;
-    });
-
-    el('btn-next').style.display        = state.isHost ? '' : 'none';
-    el('btn-stop-result').style.display = state.isHost ? '' : 'none';
-    el('res-wait').style.display        = state.isHost ? 'none' : '';
-
-    showScreen('screen-result');
-  }, 900);
+  showScreen('screen-result');
 }
 
 el('btn-next').addEventListener('click', () => socket.emit('fg:next'));
@@ -362,7 +362,7 @@ function showFinal(ranking, mode) {
         <div class="podium-score-sub">points</div>
       </div>`;
     podium.appendChild(item);
-    setTimeout(() => item.classList.add('revealed'), i * 400 + 200);
+    item.classList.add('revealed');
   });
 
   el('btn-replay').style.display = state.isHost ? '' : 'none';
@@ -370,22 +370,43 @@ function showFinal(ranking, mode) {
 }
 
 el('btn-replay').addEventListener('click', () => socket.emit('fg:replay'));
-el('btn-lobby').addEventListener('click',  () => location.reload());
+// Retour au lobby (ne quitte pas la room, tout le monde revient dans le salon)
+el('btn-lobby').addEventListener('click', () => socket.emit('fg:stop'));
+// Bouton stop pendant la question (hôte seulement)
+el('btn-stop-question').addEventListener('click', () => {
+  if (confirm('Stopper la partie et retourner au lobby ?')) socket.emit('fg:stop');
+});
 
-// ── Speedrun live feedback ─────────────────────────────────────
-function handleSpeedrunReveal(data) {
-  const { correctCode, answers } = data;
+// ── Speedrun ───────────────────────────────────────────────────
+function showSpeedrunQuestion(q) {
+  state.currentQuestion = q;
+  state.hasAnswered = false;
+
+  el('q-round').textContent    = `Q${q.qIndex}`;
+  el('q-country').textContent  = q.countryName;
+  el('speedrun-timer').style.display = '';
+  el('q-score').style.display  = '';
+  el('q-score').textContent    = `${state.myScore} pts`;
+  updateTimerBar(0, 1); // pas de barre par question en speedrun
   clearInterval(timerInterval);
 
-  // Flash correct/wrong
-  document.querySelectorAll('.flag-btn').forEach(btn => {
-    if (btn.dataset.code === correctCode) btn.classList.add('correct');
-    else if (btn.dataset.code === answers[state.myId]?.code && btn.dataset.code !== correctCode)
-      btn.classList.add('wrong');
+  el('btn-stop-question').style.display = state.isHost ? '' : 'none';
+
+  const grid = el('flags-grid');
+  grid.className = `flags-grid opts-${q.options.length}`;
+  grid.innerHTML = '';
+  q.options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'flag-btn';
+    btn.dataset.code = opt.code;
+    btn.innerHTML = `<img src="${flagUrl(opt.code)}" alt="${opt.name}"/>`;
+    btn.addEventListener('click', () => onFlagClick(opt.code, btn));
+    grid.appendChild(btn);
   });
-  state.myScore = data.players.find(p => p.id === state.myId)?.score || 0;
-  el('q-score').textContent = `${state.myScore} pts`;
-  // Next question arrives in 600ms via fg:question
+
+  el('answered-dots').innerHTML = '';
+  el('alive-strip').innerHTML   = '';
+  showScreen('screen-question');
 }
 
 // ── Socket events ──────────────────────────────────────────────
@@ -438,15 +459,10 @@ socket.on('fg:player_answered', ({ playerId }) => {
 });
 
 socket.on('fg:round_end', (data) => {
-  // Deathrun: check for winner
-  if (data.winner || data.allOut) {
+  // Deathrun: si tout le monde est éliminé, fg:game_end suit immédiatement
+  if (data.allOut) {
     clearInterval(timerInterval);
-    // Flash flags first
-    document.querySelectorAll('.flag-btn').forEach(btn => {
-      if (btn.dataset.code === data.correctCode) btn.classList.add('correct');
-    });
-    // Slight delay then let game_end fire
-    return;
+    return; // fg:game_end arrive juste après
   }
   showRoundResult(data);
 });
@@ -457,8 +473,25 @@ socket.on('fg:speedrun_tick', ({ remaining }) => {
   el('speedrun-timer').classList.toggle('urgent', remaining <= 10);
 });
 
-socket.on('fg:speedrun_reveal', (data) => {
-  handleSpeedrunReveal(data);
+// Réception de la prochaine question speedrun (et reveal de la précédente)
+socket.on('fg:speedrun_next', ({ reveal, question, score }) => {
+  state.myScore = score;
+  if (!reveal) {
+    // Première question : afficher immédiatement
+    showSpeedrunQuestion(question);
+  } else {
+    // L'utilisateur vient de cliquer — le feedback visuel est déjà affiché par onFlagClick.
+    // On attend 250ms (flash visible) puis on passe à la question suivante.
+    setTimeout(() => showSpeedrunQuestion(question), 250);
+  }
+});
+
+socket.on('fg:scores', ({ scores }) => {
+  const s = scores[state.myId];
+  if (s !== undefined) {
+    state.myScore = s;
+    el('q-score').textContent = `${s} pts`;
+  }
 });
 
 socket.on('fg:game_end', ({ ranking, mode }) => {
