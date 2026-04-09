@@ -205,7 +205,7 @@ class RiftRoom {
     if (this.pieces.has(existingPieceId)) return { error: 'Champion déjà placé' };
 
     // Row validation
-    const baseRows = team === 'blue' ? [7, 8] : [0, 1];
+    const baseRows = team === 'blue' ? [11, 12] : [0, 1];
     if (!baseRows.includes(row)) return { error: 'Ligne de placement invalide' };
 
     // Validate col
@@ -369,26 +369,28 @@ class RiftRoom {
     const moveRange = this.getEffectiveMoveRange(piece);
     if (moveRange === 0) return [];
 
-    // BFS
-    const visited = new Set();
-    const reachable = [];
-    const queue = [{ r: piece.row, c: piece.col, steps: 0 }];
-    visited.add(`${piece.row},${piece.col}`);
+    // Dijkstra-style BFS — river costs 2 movement instead of 1
+    const distMap = new Map();
+    distMap.set(`${piece.row},${piece.col}`, 0);
+    const reachableSet = new Set();
+    const queue = [{ r: piece.row, c: piece.col, d: 0 }];
 
     while (queue.length > 0) {
-      const { r, c, steps } = queue.shift();
-      if (steps === moveRange) continue;
+      const { r, c, d } = queue.shift();
+      if ((distMap.get(`${r},${c}`) ?? Infinity) < d) continue; // stale entry
 
       for (const [dr, dc] of DIRS_CARD) {
         const nr = r + dr;
         const nc = c + dc;
         const key = `${nr},${nc}`;
         if (!inBounds(nr, nc)) continue;
-        if (visited.has(key)) continue;
 
         const terrain = this.terrain[nr][nc];
-        // River blocks unless bridge
-        if (terrain === 'river') continue;
+        const cost = terrain === 'river' ? 2 : 1;
+        const nd = d + cost;
+
+        if (nd > moveRange) continue;
+        if (distMap.has(key) && distMap.get(key) <= nd) continue;
 
         // Walls block
         if (this.walls.some(w => w.r === nr && w.c === nc)) continue;
@@ -400,18 +402,18 @@ class RiftRoom {
         const occupant = this._getPieceAt(nr, nc);
         if (occupant && occupant.team !== piece.team) continue;
 
-        visited.add(key);
+        distMap.set(key, nd);
 
         // Can traverse ally-occupied cells but cannot land on them
         if (!occupant) {
-          reachable.push([nr, nc]);
+          reachableSet.add(key);
         }
 
-        queue.push({ r: nr, c: nc, steps: steps + 1 });
+        queue.push({ r: nr, c: nc, d: nd });
       }
     }
 
-    return reachable;
+    return [...reachableSet].map(k => k.split(',').map(Number));
   }
 
   _getPieceAt(r, c) {

@@ -101,6 +101,16 @@ function showScreen(id) {
 
 function chebyshev(r1,c1,r2,c2) { return Math.max(Math.abs(r1-r2), Math.abs(c1-c2)); }
 
+function showToast(msg, type = '') {
+  const c = document.getElementById('toast-container');
+  if (!c) return;
+  const t = document.createElement('div');
+  t.className = 'toast' + (type ? ' toast-' + type : '');
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3100);
+}
+
 function getTeam(playerId) {
   if (!S.gameState) return null;
   const p = S.gameState.players.find(p => p.id === playerId);
@@ -292,7 +302,7 @@ function buildBoard(boardId, state, mode = 'game') {
   const board = el(boardId);
   board.innerHTML = '';
 
-  const ROWS = 9, COLS = 13;
+  const ROWS = state.terrain ? state.terrain.length : 13, COLS = 13;
   const terrain = state.terrain;
 
   for (let r = 0; r < ROWS; r++) {
@@ -358,9 +368,11 @@ function buildBoard(boardId, state, mode = 'game') {
         const statuses = piece.statuses || [];
         const statusIcons = statuses.slice(0,4).map(s => `<span class="status-icon">${STATUS_ICONS[s.name]||'?'}</span>`).join('');
 
+        const shortName = (champDef.name || piece.championId).slice(0,5).toUpperCase();
         pieceEl.innerHTML = `
           <div class="piece-statuses">${statusIcons}</div>
           <div class="piece-emoji">${champDef.emoji || '❓'}</div>
+          <div class="piece-name-mini">${isShadow ? 'OMB' : shortName}</div>
           <div class="piece-hp-bar"><div class="piece-hp-fill ${fillClass}" style="width:${pct}%"></div></div>`;
 
         pieceEl.addEventListener('click', (e) => { e.stopPropagation(); onPieceClick(piece, cell, r, c, mode); });
@@ -432,6 +444,7 @@ function onPieceClick(piece, cellEl, r, c, mode) {
 
   // If we have an action selected (attack/spell), this is the target
   if (S.selectedAction === 'attack' && piece.team !== S.myTeam && piece.alive) {
+    triggerAttackAnim(cp.id, r, c);
     socket.emit('rb:attack', { pieceId: cp.id, targetRow: r, targetCol: c });
     S.selectedAction = null;
     clearHighlights('board-game');
@@ -479,6 +492,7 @@ function onCellClick(r, c, mode) {
     // Could be a fountain or empty cell (for AoE spells)
     const fountain = getFountainAt(S.gameState, r, c);
     if (fountain && fountain.team !== S.myTeam) {
+      triggerAttackAnim(cp.id, r, c);
       socket.emit('rb:attack', { pieceId: cp.id, targetRow: r, targetCol: c });
       S.selectedAction = null;
       clearHighlights('board-game');
@@ -555,7 +569,10 @@ function renderActionPanel(piece) {
     const onCd = sp.cd > 0;
     const done = acted.spelled || isStunned;
     btn.className = `act-btn ${done||onCd?'done':''}`;
-    btn.innerHTML = `${sp.key==='ultim'?'✨ Ultim':sp.key==='s1'?'🔮 Sort 1':'💫 Sort 2'}<br><span class="spell-cd">${sp.def?.name||''} ${onCd?`(${sp.cd} tours)`:''}</span>`;
+    const spellIcon = sp.key==='ultim' ? '✨' : sp.key==='s1' ? '🔮' : '💫';
+    const spellLabel = sp.key==='ultim' ? 'Ultim' : sp.key==='s1' ? 'Sort 1' : 'Sort 2';
+    const shortDesc = (sp.def?.desc || '').slice(0, 42) + ((sp.def?.desc||'').length > 42 ? '…' : '');
+    btn.innerHTML = `${spellIcon} ${spellLabel}<span class="spell-label">${sp.def?.name||''}</span><span class="spell-desc-mini">${shortDesc}</span>${onCd ? `<span class="spell-cd-badge">(${sp.cd} tours)</span>` : ''}`;
   });
 }
 
@@ -718,37 +735,42 @@ function getClientReachable(piece, state) {
   const occupied = new Set(state.pieces.filter(p => p.alive && p.id !== piece.id).map(p => `${p.row},${p.col}`));
   const fountainCells = new Set((state.fountains||[]).map(f => `${f.row},${f.col}`));
   const walls = new Set((state.walls||[]).map(w => `${w.r},${w.c}`));
+  const ROWS = state.terrain ? state.terrain.length : 13;
 
-  const reachable = [];
-  // BFS
-  const dist = {[`${piece.row},${piece.col}`]: 0};
-  const queue = [[piece.row, piece.col]];
+  // Dijkstra-style: river costs 2 movement
+  const distMap = new Map();
+  distMap.set(`${piece.row},${piece.col}`, 0);
+  const reachableSet = new Set();
+  const queue = [{ r: piece.row, c: piece.col, d: 0 }];
 
   while (queue.length) {
-    const [r,c] = queue.shift();
-    const d = dist[`${r},${c}`];
-    if (d >= move) continue;
+    const { r, c, d } = queue.shift();
+    if ((distMap.get(`${r},${c}`) ?? Infinity) < d) continue;
 
     for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]]) {
       const nr=r+dr, nc=c+dc;
       const key=`${nr},${nc}`;
-      if (key in dist) continue;
-      if (nr<0||nr>=9||nc<0||nc>=13) continue;
+      if (nr<0||nr>=ROWS||nc<0||nc>=13) continue;
+
       const t = getCellTerrain(state, nr, nc);
-      if (t === 'river') continue;
+      const cost = t === 'river' ? 2 : 1;
+      const nd = d + cost;
+
+      if (nd > move) continue;
+      if (distMap.has(key) && distMap.get(key) <= nd) continue;
       if (walls.has(key)) continue;
 
       const hasEnemy = occupied.has(key) && state.pieces.find(p=>p.row===nr&&p.col===nc&&p.team!==piece.team&&p.alive);
-      if (hasEnemy) continue; // blocked by enemy
+      if (hasEnemy) continue;
 
-      dist[key] = d + 1;
+      distMap.set(key, nd);
       if (!occupied.has(key) && !fountainCells.has(key) && t !== 'fountain') {
-        reachable.push([nr, nc]);
+        reachableSet.add(key);
       }
-      queue.push([nr, nc]);
+      queue.push({ r: nr, c: nc, d: nd });
     }
   }
-  return reachable;
+  return [...reachableSet].map(k => k.split(',').map(Number));
 }
 
 function getEffectiveMove(piece, state) {
@@ -956,8 +978,46 @@ function renderFinished(state) {
 
 // ── Surrender ──────────────────────────────────────────────────
 el('btn-surrender')?.addEventListener('click', () => {
-  if (confirm('Abandonner la partie ?')) socket.emit('rb:surrender');
+  socket.emit('rb:surrender');
 });
+
+// ── Animation state ────────────────────────────────────────────
+let prevPieceHPs = new Map(); // pieceId → hp  (for hit detection)
+let pendingAttackAnim = null; // { attackerId, targetRow, targetCol }
+
+function triggerAttackAnim(attackerId, targetRow, targetCol) {
+  const attackerEl = document.querySelector(`[data-piece-id="${attackerId}"]`);
+  const targetEl = getCellEl('board-game', targetRow, targetCol);
+  if (!attackerEl || !targetEl) return;
+  const ar = attackerEl.getBoundingClientRect();
+  const tr = targetEl.getBoundingClientRect();
+  const dx = (tr.left + tr.width/2) - (ar.left + ar.width/2);
+  const dy = (tr.top + tr.height/2) - (ar.top + ar.height/2);
+  const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+  const maxPx = Math.min(dist * 0.55, 36);
+  attackerEl.style.setProperty('--adx', `${(dx/dist)*maxPx}px`);
+  attackerEl.style.setProperty('--ady', `${(dy/dist)*maxPx}px`);
+  attackerEl.classList.add('anim-attack');
+  setTimeout(() => attackerEl.classList.remove('anim-attack'), 350);
+}
+
+function triggerHitAnim(piece, dmg) {
+  const cellEl = getCellEl('board-game', piece.row, piece.col);
+  if (!cellEl) return;
+  const pEl = cellEl.querySelector('.piece');
+  if (pEl) {
+    pEl.classList.add('anim-hit');
+    setTimeout(() => pEl.classList.remove('anim-hit'), 400);
+  }
+  // Floating damage number
+  const f = document.createElement('div');
+  const isCrit = dmg > 350;
+  f.className = `dmg-float dmg-damage${isCrit ? ' dmg-crit' : ''}`;
+  f.textContent = `-${dmg}`;
+  cellEl.style.position = 'relative';
+  cellEl.appendChild(f);
+  setTimeout(() => f.remove(), 950);
+}
 
 // ── Socket events ──────────────────────────────────────────────
 socket.on('rb:created', ({ roomCode, state }) => {
@@ -977,6 +1037,21 @@ socket.on('rb:joined', ({ roomCode, state }) => {
 });
 
 socket.on('rb:state', (state) => {
+  // Detect HP changes for hit animations (before re-render)
+  if (prevPieceHPs.size > 0 && state.pieces) {
+    state.pieces.forEach(p => {
+      const prev = prevPieceHPs.get(p.id);
+      if (prev !== undefined && prev > p.hp) {
+        const dmg = prev - p.hp;
+        setTimeout(() => triggerHitAnim(p, dmg), 120);
+      }
+    });
+  }
+  if (state.pieces) {
+    prevPieceHPs.clear();
+    state.pieces.forEach(p => prevPieceHPs.set(p.id, p.hp));
+  }
+
   S.gameState = state;
   S.myTeam = state.players.find(p => p.id === S.myId)?.team || S.myTeam;
 
@@ -1029,16 +1104,16 @@ socket.on('rb:error', ({ message }) => {
       break;
     }
   }
-  if (!shown) alert(message);
+  if (!shown) showToast(message, 'error');
 });
 
 socket.on('rb:player_left', ({ message }) => {
-  alert(message || 'Un joueur a quitté la partie.');
+  showToast(message || 'Un joueur a quitté la partie.', 'warn');
 });
 
 socket.on('disconnect', () => {
   if (!el('screen-lobby').classList.contains('active')) {
-    alert('Connexion perdue. Rafraîchis la page.');
+    showToast('Connexion perdue. Rafraîchis la page.', 'error');
   }
 });
 

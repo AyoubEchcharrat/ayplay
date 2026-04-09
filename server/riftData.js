@@ -1,7 +1,7 @@
 // riftData.js — Data layer for RiftBoard
-// Map: 13 cols (0–12), 9 rows (0–8). Row 0 = top (red/enemy), Row 8 = bottom (blue/player).
+// Map: 13 cols (0–12), 13 rows (0–12). Row 0 = top (red/enemy), Row 12 = bottom (blue/player).
 
-const ROWS = 9;
+const ROWS = 13;
 const COLS = 13;
 
 // ---------------------------------------------------------------------------
@@ -20,26 +20,19 @@ function buildBaseTerrain() {
     for (let c = 0; c < COLS; c++) {
       let terrain;
 
-      if (r === 0 || r === 8) {
+      if (r === 0 || r === 12) {
         terrain = 'base';
-      } else if (r === 4) {
-        if (c >= 5 && c <= 7) {
-          terrain = 'bridge';
-        } else {
-          terrain = 'river';
-        }
+      } else if (r === 6) {
+        // River row (middle), bridge at cols 5-7
+        terrain = (c >= 5 && c <= 7) ? 'bridge' : 'river';
       } else {
-        // rows 1–3 and 5–7
-        if (c >= 0 && c <= 2) {
-          terrain = 'lane';       // left lane
-        } else if (c >= 3 && c <= 4) {
+        // rows 1–5 (red side) and 7–11 (blue side)
+        if (c >= 3 && c <= 4) {
           terrain = 'jungle';
-        } else if (c >= 5 && c <= 7) {
-          terrain = 'lane';       // mid lane
         } else if (c >= 8 && c <= 9) {
           terrain = 'jungle';
         } else {
-          terrain = 'lane';       // right lane (cols 10–12)
+          terrain = 'lane';
         }
       }
 
@@ -57,9 +50,9 @@ const BASE_TERRAIN = buildBaseTerrain();
 // ---------------------------------------------------------------------------
 
 const FOUNTAINS_BLUE = [
-  { row: 8, col: 2,  hp: 3000 },
-  { row: 8, col: 6,  hp: 5000 },
-  { row: 8, col: 10, hp: 3000 },
+  { row: 12, col: 2,  hp: 3000 },
+  { row: 12, col: 6,  hp: 5000 },
+  { row: 12, col: 10, hp: 3000 },
 ];
 
 const FOUNTAINS_RED = [
@@ -663,13 +656,13 @@ const CHAMPION_LIST = [
 // STARTING POSITIONS
 // ---------------------------------------------------------------------------
 
-/** Five starting cells for the blue (player / bottom) team — row 7 */
+/** Five starting cells for the blue (player / bottom) team — row 11 */
 const BLUE_START_POSITIONS = [
-  { row: 7, col: 1 },
-  { row: 7, col: 4 },
-  { row: 7, col: 6 },
-  { row: 7, col: 9 },
-  { row: 7, col: 11 },
+  { row: 11, col: 1 },
+  { row: 11, col: 4 },
+  { row: 11, col: 6 },
+  { row: 11, col: 9 },
+  { row: 11, col: 11 },
 ];
 
 /** Five starting cells for the red (enemy / top) team — row 1 */

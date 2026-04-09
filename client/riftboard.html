@@ -2,13 +2,16 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
   <title>RiftBoard — Stratégie Tactique</title>
   <link rel="stylesheet" href="riftboard.css"/>
 </head>
 <body>
 
 <a href="/" class="btn-hub" id="hub-btn">← Hub</a>
+
+<!-- Toast notifications -->
+<div id="toast-container" class="toast-container"></div>
 
 <!-- ══════════════════════════════════════════════════════ LOBBY -->
 <div id="screen-lobby" class="screen active">
@@ -81,20 +84,22 @@
 
 <!-- ══════════════════════════════════════════════ PLACEMENT -->
 <div id="screen-placement" class="screen">
-  <div class="placement-header">
-    <h2>Phase de Placement</h2>
-    <p id="placement-subtitle">Placez vos champions dans votre base</p>
+  <div class="game-topbar">
+    <div class="topbar-left">
+      <span class="round-badge">Placement</span>
+      <span id="placement-subtitle" class="phase-label">Placez vos champions dans votre base</span>
+    </div>
   </div>
-  <div class="game-layout">
-    <div class="board-container">
+  <div class="game-body">
+    <div class="board-wrap">
       <div class="board" id="board-placement"></div>
     </div>
-    <div class="sidebar">
-      <div class="sidebar-section">
-        <div class="sidebar-title">Champions à placer</div>
+    <aside class="game-sidebar">
+      <div class="sb-section">
+        <div class="sb-title">Champions à placer</div>
         <div id="placement-queue" class="placement-queue"></div>
       </div>
-    </div>
+    </aside>
   </div>
 </div>
 
@@ -105,52 +110,50 @@
       <span id="game-round" class="round-badge">Tour 1</span>
       <span id="game-phase-label" class="phase-label">En cours</span>
     </div>
-    <div class="topbar-center" id="turn-order-bar"></div>
+    <div id="turn-order-bar" class="turn-order-bar"></div>
     <div class="topbar-right">
       <button class="btn btn-sm btn-danger" id="btn-surrender">Abandonner</button>
     </div>
   </div>
 
-  <div class="game-layout">
-    <!-- Board -->
-    <div class="board-container">
+  <div class="game-body">
+    <div class="board-wrap">
       <div class="board" id="board-game"></div>
     </div>
 
-    <!-- Sidebar -->
-    <div class="sidebar">
-      <!-- Active piece info -->
-      <div class="sidebar-section" id="active-piece-panel" style="display:none">
-        <div class="sidebar-title">Champion actif</div>
+    <aside class="game-sidebar">
+      <!-- Active piece -->
+      <div class="sb-section" id="active-piece-panel" style="display:none">
+        <div class="sb-title">Champion actif</div>
         <div id="active-piece-info"></div>
         <div class="action-buttons" id="action-buttons">
-          <button class="act-btn" id="act-move"    data-action="move">🚶 Déplacer</button>
-          <button class="act-btn" id="act-attack"  data-action="attack">⚔️ Attaquer</button>
-          <button class="act-btn" id="act-s1"      data-action="s1">Sort 1</button>
-          <button class="act-btn" id="act-s2"      data-action="s2">Sort 2</button>
-          <button class="act-btn" id="act-ultim"   data-action="ultim">✨ Ultim</button>
+          <button class="act-btn" id="act-move">🚶 Déplacer</button>
+          <button class="act-btn" id="act-attack">⚔️ Attaquer</button>
+          <button class="act-btn act-spell-btn" id="act-s1">Sort 1</button>
+          <button class="act-btn act-spell-btn" id="act-s2">Sort 2</button>
+          <button class="act-btn act-spell-btn" id="act-ultim">✨ Ultim</button>
           <button class="act-btn btn-end-turn" id="act-end">Fin de tour →</button>
         </div>
       </div>
 
-      <!-- Piece detail (hovered) -->
-      <div class="sidebar-section" id="hovered-piece-panel" style="display:none">
-        <div class="sidebar-title">Info</div>
+      <!-- Hovered piece info -->
+      <div class="sb-section" id="hovered-piece-panel" style="display:none">
+        <div class="sb-title">Info unité</div>
         <div id="hovered-piece-info"></div>
       </div>
 
       <!-- Fountain status -->
-      <div class="sidebar-section">
-        <div class="sidebar-title">Fontaines</div>
+      <div class="sb-section">
+        <div class="sb-title">Fontaines</div>
         <div id="fountain-status"></div>
       </div>
 
       <!-- Log -->
-      <div class="sidebar-section">
-        <div class="sidebar-title">Journal</div>
+      <div class="sb-section sb-log">
+        <div class="sb-title">Journal</div>
         <div id="game-log" class="game-log"></div>
       </div>
-    </div>
+    </aside>
   </div>
 </div>
 
@@ -164,9 +167,6 @@
     <button class="btn btn-secondary" id="btn-quit-fin">Quitter</button>
   </div>
 </div>
-
-<!-- Champion tooltip -->
-<div id="tooltip" class="tooltip" style="display:none"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="riftboard.js"></script>

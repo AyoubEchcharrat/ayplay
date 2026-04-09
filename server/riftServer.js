@@ -34,8 +34,8 @@ function initRiftGame(io) {
       if (r.phase !== 'draft') return socket.emit('rb:error', { message: 'Pas en phase de draft' });
       if (!Array.isArray(championIds) || championIds.length !== 5)
         return socket.emit('rb:error', { message: 'Choisir exactement 5 champions' });
-      const err = r.chooseDraft(socket.id, championIds);
-      if (err) return socket.emit('rb:error', { message: err });
+      const draftResult = r.chooseDraft(socket.id, championIds);
+      if (draftResult?.error) return socket.emit('rb:error', { message: draftResult.error });
       r.broadcast('rb:state', r.publicState());
     });
 
@@ -44,8 +44,8 @@ function initRiftGame(io) {
       const r = room();
       if (!r) return;
       if (r.phase !== 'placement') return socket.emit('rb:error', { message: 'Pas en phase de placement' });
-      const err = r.placeChampion(socket.id, championId, row, col);
-      if (err) return socket.emit('rb:error', { message: err });
+      const placeResult = r.placeChampion(socket.id, championId, row, col);
+      if (placeResult?.error) return socket.emit('rb:error', { message: placeResult.error });
       r.broadcast('rb:state', r.publicState());
     });
 
@@ -53,32 +53,32 @@ function initRiftGame(io) {
     socket.on('rb:move', ({ pieceId, row, col }) => {
       const r = room();
       if (!r) return;
-      const err = r.actionMove(socket.id, pieceId, row, col);
-      if (err) return socket.emit('rb:error', { message: err });
+      const moveResult = r.actionMove(socket.id, pieceId, row, col);
+      if (moveResult?.error) return socket.emit('rb:error', { message: moveResult.error });
       r.broadcast('rb:state', r.publicState());
     });
 
     socket.on('rb:attack', ({ pieceId, targetRow, targetCol }) => {
       const r = room();
       if (!r) return;
-      const err = r.actionAttack(socket.id, pieceId, targetRow, targetCol);
-      if (err) return socket.emit('rb:error', { message: err });
+      const attackResult = r.actionAttack(socket.id, pieceId, targetRow, targetCol);
+      if (attackResult?.error) return socket.emit('rb:error', { message: attackResult.error });
       r.broadcast('rb:state', r.publicState());
     });
 
     socket.on('rb:spell', ({ pieceId, spellKey, targetRow, targetCol, extra }) => {
       const r = room();
       if (!r) return;
-      const err = r.actionSpell(socket.id, pieceId, spellKey, targetRow, targetCol, extra);
-      if (err) return socket.emit('rb:error', { message: err });
+      const spellResult = r.actionSpell(socket.id, pieceId, spellKey, targetRow, targetCol, extra);
+      if (spellResult?.error) return socket.emit('rb:error', { message: spellResult.error });
       r.broadcast('rb:state', r.publicState());
     });
 
     socket.on('rb:end_turn', ({ pieceId }) => {
       const r = room();
       if (!r) return;
-      const err = r.actionEndTurn(socket.id, pieceId);
-      if (err) return socket.emit('rb:error', { message: err });
+      const endResult = r.actionEndTurn(socket.id, pieceId);
+      if (endResult?.error) return socket.emit('rb:error', { message: endResult.error });
       r.broadcast('rb:state', r.publicState());
     });
 
