@@ -8,11 +8,22 @@ const socket = io('/rb');
 socket.on('connect', () => {
   const savedRoom = sessionStorage.getItem('rb_room');
   const savedId   = sessionStorage.getItem('rb_myId');
-  if (savedRoom && savedId && savedId !== socket.id && S.phase !== 'lobby') {
+  if (savedRoom && savedId && savedId !== socket.id) {
+    S.myId = socket.id;
+    S.roomCode = savedRoom;
     socket.emit('rb:rejoin', { roomCode: savedRoom, previousId: savedId });
   }
 });
-socket.on('rb:reconnected',         ({ message }) => showToast(message, 'success'));
+socket.on('reconnect_failed', () => {
+  showToast('❌ Reconnexion impossible. Actualisez la page.', 'error');
+});
+socket.on('rb:reconnected', ({ message }) => {
+  sessionStorage.setItem('rb_myId', socket.id);
+  S.myId = socket.id;
+  const savedTeam = sessionStorage.getItem('rb_myTeam');
+  if (savedTeam) S.myTeam = savedTeam;
+  showToast(message || 'Reconnexion réussie !', 'success');
+});
 socket.on('rb:player_disconnected', ({ message }) => showToast(message, 'warn'));
 
 // ── State ──────────────────────────────────────────────────────
@@ -41,17 +52,17 @@ const CHAMPIONS = {
     s2:{name:'Lacération en X',     desc:'4 diagonales: dégâts + saignement 3 tours.'},
     u:{name:'Lame du Néant',        desc:'Ignore l\'armure. Exécute si cible < 35% PV.'},
     stats:{hp:1300,atk:280,arm:20,rm:25,spd:5,move:3,atkRange:1} },
-  syal:   { name:'Syal',   title:'Le Tisserand d\'Ombre',   class:'Mage',          element:'ombre',   emoji:'🌑', spd:4,
+  sayl:   { name:'Sayl',   title:'Le Tisserand d\'Ombre',   class:'Mage',          element:'ombre',   emoji:'🌑', spd:4,
     s1:{name:'Invocation d\'Ombre', desc:'Invoque une ombre spectrale sur la case ciblée (portée 2). L\'ombre peut se déplacer, attaquer (50% ATK) et utiliser Désincarnation pour se dissoudre.'},
     s2:{name:'Transposition',       desc:'Échange instantanément sa position avec celle de l\'ombre invoquée.'},
-    u:{name:'Voile Noir',           desc:'Syal devient invisible pendant 1 tour (déplacement max 2 cases). L\'invisibilité est brisée si Syal est touché.'},
+    u:{name:'Voile Noir',           desc:'Sayl devient invisible pour l\'adversaire pendant 3 tours (déplacement max 2 cases). L\'invisibilité est brisée si Sayl prend des dégâts.'},
     stats:{hp:1600,atk:240,arm:25,rm:50,spd:4,move:3,atkRange:2} },
   velara: { name:'Vélara', title:'L\'Ensorcelleuse des Marées', class:'Mage-Support', element:'eau',  emoji:'🌊', spd:3,
-    s1:{name:'Vague Horizontale',   desc:'Onde sur toute la rangée, pousse les ennemis.'},
-    s2:{name:'Brume Glacée',        desc:'Zone 2x2: ralentit et réduit l\'ATK 2 tours.'},
-    u:{name:'Déluge',               desc:'5 cases: éteint Embrasé alliés, 400 dégâts ennemis Feu.'},
+    s1:{name:'Vague Dévastatrice',  desc:'Lance une vague sur 4 cases (8 sur rivière) dans n\'importe quelle direction. Dégâts + recul ennemis. Recul alliés sans dégâts. Éteint Embrasé.'},
+    s2:{name:'Brume Glacée',        desc:'Zone rayon 2 : dégâts magiques + Gelé 2 tours aux ennemis.'},
+    u:{name:'Bénédiction des Marées', desc:'+20 ATK flat +5% ATK +1 mouvement à un allié pendant 2 tours.'},
     stats:{hp:1700,atk:200,arm:30,rm:55,spd:3,move:2,atkRange:2} },
-  pyrox:  { name:'Pyrox',  title:'Le Brasier Vivant',        class:'Mage',          element:'feu',    emoji:'🔥', spd:3,
+  pyrox:  { name:'Richard', title:'Cœur de Dragon',          class:'Mage',          element:'feu',    emoji:'🔥', spd:3,
     s1:{name:'Trait de Feu',        desc:'Tir ligne 6 cases: 350 dégâts + Embrasé.'},
     s2:{name:'Explosion Diagonale', desc:'2 flammes diagonales avant, AoE à l\'impact.'},
     u:{name:'Éruption',             desc:'Explosion rayon 3: 500 dégâts à tous, -200 PV soi.'},
@@ -81,19 +92,19 @@ const CHAMPIONS = {
     s2:{name:'Dash Électrique',     desc:'Dash diagonal 3 cases, traînée électrique derrière.'},
     u:{name:'Tempête Convergente',  desc:'Éclairs 8 directions, 300 dégâts. Étourdi 1 tour après.'},
     stats:{hp:1800,atk:210,arm:35,rm:45,spd:4,move:3,atkRange:2} },
-  syal_shadow: { name:'Ombre', title:'Projection Spectrale', class:'Mage', element:'ombre', emoji:'👤', spd:4,
+  sayl_shadow: { name:'Ombre', title:'Projection Spectrale', class:'Mage', element:'ombre', emoji:'👤', spd:4,
     s1:{name:'Désincarnation', desc:'Dissout l\'ombre immédiatement.'},
     s2:{name:'',desc:''}, u:{name:'',desc:''},
     stats:{hp:600,atk:120,arm:0,rm:0,spd:4,move:2,atkRange:1} },
 };
 
-const CHAMPION_LIST = ['karek','lysha','syal','velara','pyrox','gorath','aelys','rohn','vek','zhen'];
+const CHAMPION_LIST = ['karek','lysha','sayl','velara','pyrox','gorath','aelys','rohn','vek','zhen'];
 
 // ── Champion images ────────────────────────────────────────────
 const CHAMPION_IMGS = {
   karek:  "ChatGPT Image Apr 10, 2026, 07_05_01 PM.png",
   lysha:  "Lysha, the Ghostly Assassin.png",
-  syal:   "Le Tisserand d'Ombre in shadowcraft.png",
+  sayl:   "Le Tisserand d'Ombre in shadowcraft.png",
   velara: "Velara, mage of the tides.png",
   pyrox:  "Le Brasier Vivant_ Pyrox's fiery power.png",
   gorath: "La Forteresse_ guardian of stone and crystals.png",
@@ -324,7 +335,7 @@ function renderPlacementQueue(state) {
     const isPlaced = placed.includes(id);
     const isActive = S.placingChampionId === id;
     return `<div class="pq-item ${isActive?'active-place':''} ${isPlaced?'placed':''}" onclick="selectForPlacement('${id}')">
-      <span class="pq-emoji">${c.emoji}</span>
+      <span class="pq-emoji">${champVisual(id, c.emoji, 'pq-img')}</span>
       <span class="pq-name">${c.name}</span>
       ${isPlaced?'<span style="font-size:0.65rem;color:var(--green)">✓</span>':''}
     </div>`;
@@ -402,7 +413,7 @@ function buildBoard(boardId, state, mode = 'game') {
         const fillClass = pct > 60 ? 'full' : pct > 25 ? 'medium' : 'low';
         const isCurrent = state.currentPieceId === piece.id;
         const isActive = S.activePieceId === piece.id;
-        const isShadow = piece.championId === 'shadow';
+        const isShadow = piece.championId === 'sayl_shadow';
 
         const pieceEl = document.createElement('div');
         pieceEl.className = `piece piece-${piece.team} ${isCurrent&&isMyTurn()?'piece-active':''} ${!piece.alive?'piece-dead':''} ${isShadow?'piece-shadow':''}`;
@@ -868,7 +879,7 @@ function getClientReachable(piece, state) {
       if (nr<0||nr>=ROWS||nc<0||nc>=13) continue;
 
       const t = getCellTerrain(state, nr, nc);
-      const cost = t === 'river' ? 2 : 1;
+      const cost = (t === 'river' || t === 'jungle') ? 2 : 1;
       const nd = d + cost;
 
       if (nd > move) continue;
@@ -984,7 +995,7 @@ function showSpellHighlights(piece, spellKey) {
     });
   } else if (spellTargeting === 'single' || spellTargeting === 'dead_ally') {
     const range = getSpellRange(champId, spellKey);
-    const isSummon = (champId === 'syal' && spellKey === 's1');
+    const isSummon = (champId === 'sayl' && spellKey === 's1');
     if (isSummon) {
       // Highlight toutes les cases vides à portée
       for (let dr = -range; dr <= range; dr++) {
@@ -1008,9 +1019,15 @@ function showSpellHighlights(piece, spellKey) {
     // Target self — immediate activation
     cells.push([piece.row, piece.col]);
   } else if (spellTargeting === 'shadow') {
-    // Syal swap with shadow
+    // Sayl swap with shadow
     const shadow = S.gameState.pieces.find(p => p.id.includes('shadow') && p.team === piece.team && p.alive);
     if (shadow) cells.push([shadow.row, shadow.col]);
+  } else if (spellTargeting === 'single_ally') {
+    const range = getSpellRange(champId, spellKey);
+    S.gameState.pieces.forEach(p => {
+      if (p.alive && p.team === piece.team && p.id !== piece.id && chebyshev(piece.row,piece.col,p.row,p.col) <= range)
+        cells.push([p.row, p.col]);
+    });
   } else if (spellTargeting === 'two_diag_place') {
     const range = getSpellRange(champId, spellKey);
     [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
@@ -1038,8 +1055,8 @@ function getSpellTargeting(champId, spellKey) {
   const spellMap = {
     karek:  {s1:'line', s2:'front_arc', ultim:'self'},
     lysha:  {s1:'diag_jump', s2:'all_diag', ultim:'adjacent'},
-    syal:   {s1:'single', s2:'shadow', ultim:'self'},
-    velara: {s1:'full_row', s2:'aoe_self', ultim:'line'},
+    sayl:   {s1:'single', s2:'shadow', ultim:'self'},
+    velara: {s1:'line', s2:'aoe_self', ultim:'single_ally'},
     pyrox:  {s1:'line', s2:'all_diag', ultim:'self'},
     gorath: {s1:'adjacent', s2:'self', ultim:'self'},
     aelys:  {s1:'single', s2:'all_diag', ultim:'dead_ally'},
@@ -1052,7 +1069,7 @@ function getSpellTargeting(champId, spellKey) {
 function getSpellRange(champId, spellKey) {
   const rangeMap = {
     karek:{s1:4,s2:2,ultim:0}, lysha:{s1:3,s2:2,ultim:1},
-    syal:{s1:2,s2:99,ultim:0}, velara:{s1:12,s2:3,ultim:5},
+    sayl:{s1:2,s2:99,ultim:0}, velara:{s1:4,s2:2,ultim:4},
     pyrox:{s1:6,s2:4,ultim:3}, gorath:{s1:2,s2:2,ultim:0},
     aelys:{s1:3,s2:2,ultim:99}, rohn:{s1:7,s2:3,ultim:99},
     vek:{s1:1,s2:1,ultim:0}, zhen:{s1:5,s2:3,ultim:4},
@@ -1080,7 +1097,37 @@ function renderGame(state) {
 
   if (state.phase !== 'playing' && state.phase !== 'finished') return;
 
+  // Snapshot positions avant rebuild
+  const posBefore = new Map();
+  if (S.gameState?.pieces) {
+    S.gameState.pieces.forEach(p => posBefore.set(p.id, { row: p.row, col: p.col }));
+  }
+
   buildBoard('board-game', state, 'game');
+
+  // Animer les pièces déplacées + ghost sur ancienne position
+  state.pieces.forEach(p => {
+    const prev = posBefore.get(p.id);
+    if (!prev || (prev.row === p.row && prev.col === p.col)) return;
+    // Ghost sur ancienne position
+    const ghostCell = getCellEl('board-game', prev.row, prev.col);
+    if (ghostCell) {
+      ghostCell.classList.add('cell-prev-pos');
+      setTimeout(() => ghostCell.classList.remove('cell-prev-pos'), 500);
+    }
+    // Slide animation sur nouvelle position
+    const pieceEl = document.querySelector(`[data-piece-id="${p.id}"]`);
+    if (!pieceEl) return;
+    const board = el('board-game');
+    const cellSize = board.children[0]?.offsetWidth || 48;
+    const dx = (prev.col - p.col) * cellSize;
+    const dy = (prev.row - p.row) * cellSize;
+    pieceEl.style.setProperty('--move-from-x', `${dx}px`);
+    pieceEl.style.setProperty('--move-from-y', `${dy}px`);
+    pieceEl.classList.add('piece-moving');
+    setTimeout(() => pieceEl.classList.remove('piece-moving'), 280);
+  });
+
   renderTurnOrderBar(state);
   renderLog(state);
 
@@ -1137,6 +1184,7 @@ function showTurnBanner(champId, name, isMyTurn) {
 
 let prevPieceHPs = new Map(); // pieceId → hp  (for hit detection)
 let pendingAttackAnim = null; // { attackerId, targetRow, targetCol }
+let prevPiecePositions = new Map(); // pieceId → {row, col}
 
 function triggerAttackAnim(attackerId, targetRow, targetCol) {
   const attackerEl = document.querySelector(`[data-piece-id="${attackerId}"]`);
@@ -1351,8 +1399,9 @@ socket.on('rb:created', ({ roomCode, state }) => {
   S.myId = socket.id;
   S.roomCode = roomCode;
   S.myTeam = state.players.find(p => p.id === S.myId)?.team || 'blue';
-  sessionStorage.setItem('rb_room', S.roomCode);
-  sessionStorage.setItem('rb_myId', S.myId);
+  sessionStorage.setItem('rb_room', roomCode);
+  sessionStorage.setItem('rb_myId', socket.id);
+  sessionStorage.setItem('rb_myTeam', S.myTeam);
   showScreen('screen-waiting');
   renderWaiting(state);
 });
@@ -1361,13 +1410,17 @@ socket.on('rb:joined', ({ roomCode, state }) => {
   S.myId = socket.id;
   S.roomCode = roomCode;
   S.myTeam = state.players.find(p => p.id === S.myId)?.team || 'red';
-  sessionStorage.setItem('rb_room', S.roomCode);
-  sessionStorage.setItem('rb_myId', S.myId);
+  sessionStorage.setItem('rb_room', roomCode);
+  sessionStorage.setItem('rb_myId', socket.id);
+  sessionStorage.setItem('rb_myTeam', S.myTeam);
   showScreen('screen-waiting');
   renderWaiting(state);
 });
 
 socket.on('rb:state', (state) => {
+  // Restaurer l'identité si on vient d'un rejoin
+  if (!S.myId) S.myId = socket.id;
+  if (!S.myTeam) S.myTeam = sessionStorage.getItem('rb_myTeam') || null;
   // Detect HP changes for hit animations (before re-render)
   if (prevPieceHPs.size > 0 && state.pieces) {
     state.pieces.forEach(p => {
@@ -1457,7 +1510,7 @@ socket.on('rb:player_left', ({ message }) => {
 
 socket.on('disconnect', () => {
   if (!el('screen-lobby').classList.contains('active')) {
-    showToast('Connexion perdue. Rafraîchis la page.', 'error');
+    showToast('⚡ Connexion perdue — tentative de reconnexion…', 'warn');
   }
 });
 

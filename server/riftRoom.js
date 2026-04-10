@@ -120,6 +120,22 @@ class RiftRoom {
     for (const p of this.players.values()) p.socket.emit(event, data);
   }
 
+  broadcastState() {
+    for (const [playerId, player] of this.players) {
+      const state = this.publicState();
+      // Masquer les pièces ennemies invisibles (sauf si adjacentes)
+      const myPieces = state.pieces.filter(p => p.team === player.team && p.alive);
+      state.pieces = state.pieces.filter(p => {
+        if (p.team === player.team) return true;
+        const isInvisible = p.statuses?.some(s => s.name === 'invisible');
+        if (!isInvisible) return true;
+        // Révéler si une pièce alliée est adjacente (chebyshev ≤ 1)
+        return myPieces.some(mp => Math.max(Math.abs(mp.row - p.row), Math.abs(mp.col - p.col)) <= 1);
+      });
+      player.socket.emit('rb:state', state);
+    }
+  }
+
   // ── Public state ─────────────────────────────────────────────────────────────
 
   publicState() {
@@ -140,6 +156,7 @@ class RiftRoom {
       walls:     this.walls,
       traps:     this.traps,
       trails:    this.trails,
+      waterTrails: this.waterTrails || [],
       turnOrder: this.turnOrder,
       currentPieceId,
       currentTeam,
@@ -166,7 +183,7 @@ class RiftRoom {
     player.ready = true;
 
     this.log.push(`${player.name} a choisi ses champions.`);
-    this.broadcast('rb:state', this.publicState());
+    this.broadcastState();
 
     const players = [...this.players.values()];
     if (players.length === 2 && players.every(p => p.ready)) {
@@ -301,7 +318,7 @@ class RiftRoom {
     this.turnOrder = alivePieces.map(p => p.id);
 
     this.log.push(`🎮 Partie lancée ! Ordre de jeu : ${this.turnOrder.map(id => { const p = this.pieces.get(id); return this._pieceName(p); }).join(' → ')}`);
-    this.broadcast('rb:state', this.publicState());
+    this.broadcastState();
   }
 
   // ── Turn helpers ──────────────────────────────────────────────────────────────
@@ -399,7 +416,7 @@ class RiftRoom {
         if (!inBounds(nr, nc)) continue;
 
         const terrain = this.terrain[nr][nc];
-        const cost = terrain === 'river' ? 2 : 1;
+        const cost = (terrain === 'river' || terrain === 'jungle') ? 2 : 1;
         const nd = d + cost;
 
         if (nd > moveRange) continue;
@@ -584,7 +601,7 @@ class RiftRoom {
     }
 
     this.log.push(`🚶 ${this._pieceName(piece)} se déplace en (${targetRow},${targetCol}) [coût:${moveCost}, restant:${Math.max(0,effective-piece.actedThisTurn.moveUsed)}].`);
-    this.broadcast('rb:state', this.publicState());
+    this.broadcastState();
     return { ok: true };
   }
 
@@ -642,7 +659,7 @@ class RiftRoom {
         const dc = piece.col < targetPiece.col ? -1 : 1;
         this.pushPiece(piece, dr, dc, 2);
         piece.actedThisTurn.attacked = true;
-        this.broadcast('rb:state', this.publicState());
+        this.broadcastState();
         return { ok: true };
       }
 
@@ -704,7 +721,7 @@ class RiftRoom {
     }
 
     piece.actedThisTurn.attacked = true;
-    this.broadcast('rb:state', this.publicState());
+    this.broadcastState();
     return { ok: true };
   }
 
@@ -742,7 +759,7 @@ class RiftRoom {
     }
 
     this.log.push(`✨ ${this._pieceName(piece)} lance [${spell.name}]!`);
-    this.broadcast('rb:state', this.publicState());
+    this.broadcastState();
     return { ok: true };
   }
 
@@ -898,6 +915,15 @@ class RiftRoom {
         break;
       }
 
+      case 'single_ally': {
+        const dist = chebyshev(caster.row, caster.col, targetRow, targetCol);
+        if (dist > range) return { error: 'Cible hors portée' };
+        const t = this._getPieceAt(targetRow, targetCol);
+        if (!t || t.team !== caster.team) return { error: 'Cible invalide : allié requis' };
+        collected.push({ row: targetRow, col: targetCol });
+        break;
+      }
+
       default:
         break;
     }
@@ -942,6 +968,27 @@ class RiftRoom {
         if (effect.lifesteal) {
           const ls = effect.lifesteal;
           // Done below in lifesteal effect
+        }
+
+        // Brûler la jungle si l'effet le demande
+        if (effect.burnsJungle) {
+          for (const cell of targets) {
+            if (this.terrain[cell.row]?.[cell.col] === 'jungle') {
+              this.terrain[cell.row][cell.col] = 'lane';
+              this.log.push(`🔥 La jungle en (${cell.row},${cell.col}) prend feu!`);
+            }
+          }
+        }
+        // Laisser une trainée d'eau
+        if (effect.leavesWaterTrail) {
+          for (const cell of targets) {
+            const orig = this.terrain[cell.row]?.[cell.col];
+            if (orig === 'lane' || orig === 'jungle') {
+              this.waterTrails = this.waterTrails || [];
+              this.waterTrails.push({ r: cell.row, c: cell.col, origTerrain: orig, duration: 1 });
+              this.terrain[cell.row][cell.col] = 'river';
+            }
+          }
         }
         break;
       }
@@ -1193,12 +1240,12 @@ class RiftRoom {
             break;
           }
         }
-        const shadowId = `${caster.team}_syal_shadow`;
+        const shadowId = `${caster.team}_sayl_shadow`;
         const spawnRow = (typeof targetRow === 'number') ? targetRow : caster.row;
         const spawnCol = (typeof targetCol === 'number') ? targetCol : caster.col;
         const shadow = {
           id: shadowId,
-          championId: 'syal_shadow',
+          championId: 'sayl_shadow',
           team: caster.team,
           row: spawnRow, col: spawnCol,
           hp: 600, maxHp: 600,
@@ -1486,6 +1533,102 @@ class RiftRoom {
         break;
       }
 
+      case 'tidal_wave': {
+        // Determine direction from caster to target
+        const dr = Math.sign(targetRow - caster.row);
+        const dc = Math.sign(targetCol - caster.col);
+        if (dr === 0 && dc === 0) break;
+        // Range depends on caster terrain
+        const casterTerrain = this.terrain[caster.row]?.[caster.col];
+        const waveRange = (casterTerrain === 'river' || casterTerrain === 'bridge')
+          ? (effect.extendedRange || 8)
+          : (spell.range || 4);
+        // Collect cells along the wave
+        const waveCells = [];
+        for (let i = 1; i <= waveRange; i++) {
+          const wr = caster.row + dr * i;
+          const wc = caster.col + dc * i;
+          if (!inBounds(wr, wc)) break;
+          waveCells.push({ row: wr, col: wc });
+        }
+        // Apply to each cell
+        for (const cell of waveCells) {
+          const target = this._getPieceAt(cell.row, cell.col);
+          if (!target) {
+            // No piece, just handle water trail
+            if (effect.leavesWaterTrail) {
+              const orig = this.terrain[cell.row]?.[cell.col];
+              if (orig === 'lane' || orig === 'jungle') {
+                this.waterTrails = this.waterTrails || [];
+                this.waterTrails.push({ r: cell.row, c: cell.col, origTerrain: orig, duration: 1 });
+                this.terrain[cell.row][cell.col] = 'river';
+                this.log.push(`🌊 Trainée d'eau sur (${cell.row},${cell.col}).`);
+              }
+            }
+            continue;
+          }
+          // Extinguish embrasé on everyone
+          if (this.hasStatus(target, 'embrasé')) {
+            this.removeStatus(target, 'embrasé');
+            this.log.push(`🌊 Vague éteint l'embrasement de ${this._pieceName(target)}!`);
+          }
+          // Push back 1 cell
+          const pushDr = dr;
+          const pushDc = dc;
+          const pr = target.row + pushDr;
+          const pc = target.col + pushDc;
+          const canPush = inBounds(pr, pc) && !this._getPieceAt(pr, pc) && !this._getFountainAt(pr, pc)
+            && !this.walls.some(w => w.r === pr && w.c === pc);
+          if (canPush) { target.row = pr; target.col = pc; }
+          // Damage enemies only
+          if (target.team !== caster.team) {
+            const dmg = calcMagicDmg(200 + Math.floor(caster.rm * 0.8), target.rm, 0);
+            const actual = this._applyDamage(target, dmg);
+            this.log.push(`🌊 ${this._pieceName(caster)} frappe ${this._pieceName(target)} pour ${actual} dégâts.`);
+          } else {
+            this.log.push(`🌊 Vague repousse allié ${this._pieceName(target)}.`);
+          }
+          // Water trail on the cell the piece was on (before push)
+          if (effect.leavesWaterTrail) {
+            const orig = this.terrain[cell.row]?.[cell.col];
+            if (orig === 'lane' || orig === 'jungle') {
+              this.waterTrails = this.waterTrails || [];
+              this.waterTrails.push({ r: cell.row, c: cell.col, origTerrain: orig, duration: 1 });
+              this.terrain[cell.row][cell.col] = 'river';
+              this.log.push(`🌊 Trainée d'eau sur (${cell.row},${cell.col}).`);
+            }
+          }
+        }
+        break;
+      }
+
+      case 'ally_atk_buff': {
+        const target = this._getPieceAt(targetRow, targetCol);
+        if (!target || target.team !== caster.team || !target.alive) break;
+        const atkBonus = (effect.flat || 0) + Math.floor(target.atk * (effect.percent || 0));
+        target.atk += atkBonus;
+        target.bonusMove = (target.bonusMove || 0) + (effect.movBonus || 0);
+        this.addStatus(target, 'béni_marée', effect.duration || 2, atkBonus);
+        this.log.push(`✨ ${this._pieceName(caster)} bénit ${this._pieceName(target)}: +${atkBonus} ATK, +${effect.movBonus||0} move.`);
+        break;
+      }
+
+      case 'leave_fire_trail': {
+        for (const cell of targets) {
+          this.trails.push({
+            r: cell.row, c: cell.col, type: 'fire',
+            dmg: effect.dmg || 80,
+            status: { name: 'embrasé', duration: 2, value: 50 },
+            duration: effect.duration || 1,
+          });
+          if (this.terrain[cell.row]?.[cell.col] === 'jungle') {
+            this.terrain[cell.row][cell.col] = 'lane';
+            this.log.push(`🔥 Trainée de feu brûle la jungle en (${cell.row},${cell.col})!`);
+          }
+        }
+        break;
+      }
+
       default:
         // Unknown effect type, skip
         break;
@@ -1545,7 +1688,11 @@ class RiftRoom {
       // Reduce status durations on current piece
       currentPiece.statuses = currentPiece.statuses.filter(s => {
         s.duration--;
-        return s.duration > 0;
+        if (s.duration <= 0) {
+          this._onStatusExpire(currentPiece, s);
+          return false;
+        }
+        return true;
       });
 
       // Reset actedThisTurn
@@ -1558,6 +1705,16 @@ class RiftRoom {
     this.walls = this.walls.filter(w => { w.duration--; return w.duration > 0; });
     this.traps = this.traps.filter(t => { t.duration--; return t.duration > 0; });
     this.trails = this.trails.filter(t => { t.duration--; return t.duration > 0; });
+    if (this.waterTrails) {
+      this.waterTrails = (this.waterTrails || []).filter(t => {
+        t.duration--;
+        if (t.duration <= 0) {
+          this.terrain[t.r][t.c] = t.origTerrain;
+          return false;
+        }
+        return true;
+      });
+    }
 
     // Advance turn index
     const oldIndex = this.turnIndex;
@@ -1601,7 +1758,7 @@ class RiftRoom {
     // Skip stunned or dead pieces
     this._skipInvalidPieces();
 
-    this.broadcast('rb:state', this.publicState());
+    this.broadcastState();
   }
 
   _applyStartOfRoundEffects(piece) {
@@ -1629,6 +1786,16 @@ class RiftRoom {
         default:
           break;
       }
+    }
+  }
+
+  _onStatusExpire(piece, status) {
+    switch (status.name) {
+      case 'béni_marée':
+        piece.atk = Math.max(0, piece.atk - (status.value || 0));
+        piece.bonusMove = Math.max(0, (piece.bonusMove || 0) - 1);
+        this.log.push(`La bénédiction des marées de ${this._pieceName(piece)} expire.`);
+        break;
     }
   }
 
@@ -1675,10 +1842,10 @@ class RiftRoom {
       if (owner && owner.alive) {
         owner.hasShadow = false;
         owner.shadowId = null;
-        // If Syal ultim was used (convergence with shadow), give +200 HP
+        // If Sayl ultim was used (convergence with shadow), give +200 HP
         if (owner.ultUsed) {
           owner.hp = Math.min(owner.maxHp, owner.hp + 200);
-          this.log.push(`L'ombre de Syal est détruite, Syal récupère 200 PV.`);
+          this.log.push(`L'ombre de Sayl est détruite, Sayl récupère 200 PV.`);
         }
       }
     }
@@ -1716,7 +1883,7 @@ class RiftRoom {
     this.winner = winner;
     this.phase  = 'finished';
     this.log.push(`Partie terminée! L'équipe ${winner === 'blue' ? 'bleue' : 'rouge'} remporte la victoire!`);
-    this.broadcast('rb:state', this.publicState());
+    this.broadcastState();
     this.broadcast('rb:game_end', { winner });
   }
 }

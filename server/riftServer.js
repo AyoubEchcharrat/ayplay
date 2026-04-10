@@ -126,9 +126,9 @@ function initRiftGame(io) {
           r.endGame(remaining[0].team);
           r.broadcast('rb:state', r.publicState());
         }
-      }, 30000);
+      }, 120000);
       r._reconnectTimers.set(socket.id, timer);
-      r.broadcast('rb:player_disconnected', { message: `${p.name} a perdu la connexion… (30s pour se reconnecter)` });
+      r.broadcast('rb:player_disconnected', { message: `${p.name} a perdu la connexion… (2min pour se reconnecter)` });
     });
   });
 }

@@ -14,6 +14,19 @@ const COLS = 13;
  */
 function buildBaseTerrain() {
   const grid = [];
+  // Staircase jungle: narrower near base, wider toward river
+  // Defined per row for red side; mirror for blue side
+  const jungleCols = (r) => {
+    // Distance from river (row 6)
+    const distFromRiver = Math.abs(r - 6);
+    if (distFromRiver === 5) return [[1,2],[10,11]];         // rows 1, 11 : 2 cols
+    if (distFromRiver === 4) return [[1,3],[9,11]];          // rows 2, 10 : 3 cols
+    if (distFromRiver === 3) return [[1,3],[9,11]];          // rows 3, 9  : 3 cols
+    if (distFromRiver === 2) return [[2,4],[8,10]];          // rows 4, 8  : 3 cols décalées
+    if (distFromRiver === 1) return [[2,4],[8,10]];          // rows 5, 7  : 3 cols décalées
+    return [];
+  };
+
   for (let r = 0; r < ROWS; r++) {
     grid[r] = [];
     for (let c = 0; c < COLS; c++) {
@@ -23,8 +36,9 @@ function buildBaseTerrain() {
       } else if (r === 6) {
         terrain = (c === 6) ? 'bridge' : 'river';
       } else {
-        const inJungle = (c >= 1 && c <= 3) || (c >= 9 && c <= 11);
-        terrain = inJungle ? 'jungle' : 'lane';
+        const ranges = jungleCols(r);
+        const isJungle = ranges.some(([lo, hi]) => c >= lo && c <= hi);
+        terrain = isJungle ? 'jungle' : 'lane';
       }
       grid[r][c] = terrain;
     }
@@ -129,7 +143,7 @@ const CHAMPIONS = {
         cd: 2,
         effects: [
           { type: 'caster_move_to_line_end' },
-          { type: 'damage', base: 250, scaling: 'atk' },
+          { type: 'damage', base: 250, scaling: 'atk', burnsJungle: true },
           { type: 'push', dir: 'side', dist: 1 },
           { type: 'status', name: 'embrasé', duration: 2, value: 40 },
         ],
@@ -212,9 +226,9 @@ const CHAMPIONS = {
     },
   },
 
-  syal: {
-    id: 'syal',
-    name: 'Syal',
+  sayl: {
+    id: 'sayl',
+    name: 'Sayl',
     title: 'Le Tisserand d\'Ombre',
     class: 'mage',
     element: 'ombre',
@@ -251,12 +265,12 @@ const CHAMPIONS = {
       },
       ultim: {
         name: 'Voile Noir',
-        desc: 'Syal devient invisible pendant 1 tour (déplacement max 2 cases). L\'invisibilité est brisée si Syal est touché.',
+        desc: 'Sayl devient invisible pour l\'adversaire pendant 3 tours (déplacement max 2 cases). L\'invisibilité est brisée si Sayl prend des dégâts.',
         targeting: 'self',
         range: 0,
         cd: 4,
         effects: [
-          { type: 'status', name: 'invisible', duration: 1, self: true },
+          { type: 'status', name: 'invisible', duration: 3, self: true },
         ],
       },
     },
@@ -280,35 +294,34 @@ const CHAMPIONS = {
     },
     spells: {
       s1: {
-        name: 'Vague Horizontale',
-        desc: 'Envoie une vague sur toute la rangée, poussant les ennemis de 2 cases.',
-        targeting: 'full_row',
-        range: 12,
+        name: 'Vague Dévastatrice',
+        desc: 'Lance une vague dans une direction (H/V/diag) sur 4 cases (8 si sur rivière). Dégâts aux ennemis + recul 1 case. Alliés : recul sans dégâts. Éteint Embrasé sur tous.',
+        targeting: 'line',
+        range: 4,
         cd: 0,
         effects: [
-          { type: 'damage', base: 200, scaling: 'rm' },
-          { type: 'push', dir: 'horizontal', dist: 2 },
+          { type: 'tidal_wave', extendedRange: 8, leavesWaterTrail: true },
         ],
       },
       s2: {
         name: 'Brume Glacée',
-        desc: 'Gèle les ennemis dans un rayon de 2 cases autour de Vélara.',
+        desc: 'Zone de rayon 2 autour de Vélara : dégâts magiques + statut Gelé 2 tours aux ennemis.',
         targeting: 'aoe_self',
         range: 2,
         cd: 2,
         effects: [
-          { type: 'damage', base: 150, scaling: 'rm' },
+          { type: 'damage', base: 150, scaling: 'rm', leavesWaterTrail: true },
           { type: 'status', name: 'gelé', duration: 2, value: 1 },
         ],
       },
       ultim: {
-        name: 'Déluge',
-        desc: 'Déluge en ligne : éteint embrasé sur les alliés, inflige 400 dégâts aux ennemis feu.',
-        targeting: 'line',
-        range: 5,
+        name: 'Bénédiction des Marées',
+        desc: 'Confère à un allié ciblé +20 ATK flat + 5% ATK bonus + 1 mouvement pendant 2 tours.',
+        targeting: 'single_ally',
+        range: 4,
         cd: 5,
         effects: [
-          { type: 'deluge' },
+          { type: 'ally_atk_buff', flat: 20, percent: 0.05, movBonus: 1, duration: 2 },
         ],
       },
     },
@@ -316,8 +329,8 @@ const CHAMPIONS = {
 
   pyrox: {
     id: 'pyrox',
-    name: 'Pyrox',
-    title: 'Le Brasier Vivant',
+    name: 'Richard',
+    title: 'Cœur de Dragon',
     class: 'mage',
     element: 'feu',
     emoji: '🔥',
@@ -338,8 +351,9 @@ const CHAMPIONS = {
         range: 6,
         cd: 0,
         effects: [
-          { type: 'damage', base: 350, scaling: 'rm' },
+          { type: 'damage', base: 350, scaling: 'rm', burnsJungle: true },
           { type: 'status', name: 'embrasé', duration: 3, value: 50 },
+          { type: 'leave_fire_trail', dmg: 80, duration: 1 },
         ],
       },
       s2: {
@@ -349,8 +363,9 @@ const CHAMPIONS = {
         range: 4,
         cd: 2,
         effects: [
-          { type: 'damage', base: 250, scaling: 'rm' },
+          { type: 'damage', base: 250, scaling: 'rm', burnsJungle: true },
           { type: 'aoe_splash', radius: 1 },
+          { type: 'leave_fire_trail', dmg: 60, duration: 1 },
         ],
       },
       ultim: {
@@ -627,8 +642,8 @@ const CHAMPIONS = {
     },
   },
 
-  syal_shadow: {
-    id: 'syal_shadow',
+  sayl_shadow: {
+    id: 'sayl_shadow',
     name: 'Ombre',
     title: 'Projection Spectrale',
     class: 'mage',
@@ -663,7 +678,7 @@ const CHAMPIONS = {
 const CHAMPION_LIST = [
   'karek',
   'lysha',
-  'syal',
+  'sayl',
   'velara',
   'pyrox',
   'gorath',
