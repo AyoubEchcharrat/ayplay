@@ -137,8 +137,9 @@ const CHAMPIONS = {
         desc: 'Fonce en ligne droite sur 4 cases et repousse les ennemis sur le côté.',
         targeting: 'line',
         range: 4,
-        cd: 0,
+        cd: 2,
         effects: [
+          { type: 'caster_move_to_line_end' },
           { type: 'damage', base: 250, scaling: 'atk' },
           { type: 'push', dir: 'side', dist: 1 },
         ],
@@ -239,19 +240,18 @@ const CHAMPIONS = {
     },
     spells: {
       s1: {
-        name: 'Voile Noir',
-        desc: 'Devient invisible 1 tour et invoque une ombre à sa position actuelle.',
-        targeting: 'adjacent',
-        range: 1,
-        cd: 0,
+        name: 'Invocation d\'Ombre',
+        desc: 'Invoque une ombre spectrale sur la case ciblée (portée 2). L\'ombre peut se déplacer, attaquer (50% ATK) et utiliser Désincarnation pour se dissoudre.',
+        targeting: 'single',
+        range: 2,
+        cd: 3,
         effects: [
-          { type: 'status', name: 'invisible', duration: 1, self: true },
           { type: 'summon_shadow' },
         ],
       },
       s2: {
         name: 'Transposition',
-        desc: 'Se téléporte à la position de l\'ombre invoquée.',
+        desc: 'Échange instantanément sa position avec celle de l\'ombre invoquée.',
         targeting: 'shadow',
         range: 99,
         cd: 2,
@@ -260,14 +260,13 @@ const CHAMPIONS = {
         ],
       },
       ultim: {
-        name: 'Convergence',
-        desc: 'Frappe unique à demi-pénétration d\'armure magique avec mini-éclaboussure.',
-        targeting: 'single',
-        range: 4,
-        cd: 5,
+        name: 'Voile Noir',
+        desc: 'Syal devient invisible pendant 1 tour (déplacement max 2 cases). L\'invisibilité est brisée si Syal est touché.',
+        targeting: 'self',
+        range: 0,
+        cd: 4,
         effects: [
-          { type: 'damage', base: 500, scaling: 'rm', armorPen: 0.5 },
-          { type: 'aoe_splash', radius: 0 },
+          { type: 'status', name: 'invisible', duration: 1, self: true },
         ],
       },
     },
@@ -392,7 +391,7 @@ const CHAMPIONS = {
       arm: 90,
       rm: 60,
       spd: 1,
-      move: 1,
+      move: 2,
       atkRange: 1,
     },
     spells: {
@@ -407,13 +406,14 @@ const CHAMPIONS = {
         ],
       },
       s2: {
-        name: 'Provocation',
-        desc: 'Force tous les ennemis dans un rayon de 2 cases à l\'attaquer pendant 1 tour.',
+        name: 'Rush de Forteresse',
+        desc: 'Fonce en avant avec une vitesse surprenante : +4 de déplacement ce tour, mais -25% ARM et RM jusqu\'au prochain tour.',
         targeting: 'self',
         range: 0,
-        cd: 2,
+        cd: 3,
         effects: [
-          { type: 'taunt', radius: 2, duration: 1 },
+          { type: 'bonus_move', amount: 4 },
+          { type: 'self_debuff_armor', percent: 0.25, duration: 1 },
         ],
       },
       ultim: {
@@ -448,8 +448,8 @@ const CHAMPIONS = {
     spells: {
       s1: {
         name: 'Rayon de Soin',
-        desc: 'Rayon en ligne : soigne les alliés (350) ou blesse les ennemis (200).',
-        targeting: 'line',
+        desc: 'Soin ciblé à portée 3 : soigne un allié (350 PV) ou blesse un ennemi (200 PV). Soigne aussi Aelys elle-même si elle se cible.',
+        targeting: 'single',
         range: 3,
         cd: 0,
         effects: [
@@ -631,6 +631,36 @@ const CHAMPIONS = {
         effects: [
           { type: 'star_burst', directions: 8, range: 4, base: 300, scaling: 'rm' },
           { type: 'status', name: 'étourdi', duration: 1, self: true },
+        ],
+      },
+    },
+  },
+
+  syal_shadow: {
+    id: 'syal_shadow',
+    name: 'Ombre',
+    title: 'Projection Spectrale',
+    class: 'mage',
+    element: 'ombre',
+    emoji: '👤',
+    stats: {
+      hp: 600,
+      atk: 120,
+      arm: 0,
+      rm: 0,
+      spd: 4,
+      move: 2,
+      atkRange: 1,
+    },
+    spells: {
+      s1: {
+        name: 'Désincarnation',
+        desc: 'Dissout l\'ombre immédiatement.',
+        targeting: 'self',
+        range: 0,
+        cd: 0,
+        effects: [
+          { type: 'kill_self' },
         ],
       },
     },

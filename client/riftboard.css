@@ -486,6 +486,48 @@ input::placeholder { color:var(--text2); }
 .finished-sub   { color:var(--text2); font-size:0.9rem; margin-bottom:20px; }
 .fin-stats { background:var(--bg3); border-radius:8px; padding:14px; margin-bottom:20px; font-size:0.82rem; color:var(--text2); }
 
+/* ── Turn announcement banner ──────────────────────────────── */
+#turn-banner {
+  position:fixed; top:42%; left:50%;
+  transform:translateX(-50%);
+  z-index:900; pointer-events:none;
+  display:none; align-items:center; gap:14px;
+  background:rgba(10,12,20,0.94); border-radius:12px;
+  padding:14px 32px; border:2px solid var(--gold);
+  box-shadow:0 0 40px rgba(200,155,60,0.3), var(--shadow);
+  backdrop-filter:blur(10px); white-space:nowrap;
+}
+#turn-banner.show { display:flex; animation:banner-sweep 2s ease forwards; }
+#turn-banner.enemy-turn { border-color:var(--red2); box-shadow:0 0 40px rgba(244,67,54,0.25), var(--shadow); }
+.tb-emoji { font-size:2rem; }
+.tb-name  { font-size:1.1rem; font-weight:900; color:var(--text); }
+.tb-label { font-size:0.75rem; color:var(--gold); font-weight:700; text-transform:uppercase; letter-spacing:1px; }
+#turn-banner.enemy-turn .tb-label { color:var(--red2); }
+@keyframes banner-sweep {
+  0%   { opacity:0; transform:translateX(calc(-50% - 220px)) scale(0.85); }
+  18%  { opacity:1; transform:translateX(-50%) scale(1.04); }
+  28%  { transform:translateX(-50%) scale(1); }
+  72%  { opacity:1; transform:translateX(-50%) scale(1); }
+  100% { opacity:0; transform:translateX(calc(-50% + 220px)) scale(0.85); }
+}
+
+/* ── Attack range indicator ────────────────────────────────── */
+.cell.highlight-attack-range { background:rgba(255,80,80,0.08) !important; }
+.cell.highlight-attack-range:hover { background:rgba(255,80,80,0.16) !important; }
+
+/* ── Spell full tooltip ────────────────────────────────────── */
+.spell-tooltip-popup {
+  position:fixed; z-index:9999;
+  background:var(--bg2); border:1px solid rgba(200,155,60,0.3);
+  border-radius:10px; padding:12px 16px; max-width:260px;
+  box-shadow:var(--shadow); pointer-events:none;
+  font-size:0.78rem; line-height:1.5;
+}
+.stp-title { font-weight:700; color:var(--gold); font-size:0.85rem; margin-bottom:5px; }
+.stp-desc  { color:var(--text2); margin-bottom:6px; }
+.stp-stats { font-size:0.7rem; color:var(--text2); }
+.stp-key   { color:var(--text); font-weight:700; }
+
 /* ══════════════════ MOBILE (≤ 767px) ════════════════════════ */
 @media (max-width: 767px) {
   :root {

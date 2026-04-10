@@ -130,7 +130,7 @@ class RiftRoom {
       turnOrder: this.turnOrder,
       currentPieceId,
       currentTeam,
-      placementTeam: this.placementQueue?.[0] || null,
+      placementTeam: null,
       winner:  this.winner,
       log:     this.log.slice(-20),
       terrain: this.terrain,
@@ -178,14 +178,23 @@ class RiftRoom {
       this.fountains.set(id, { id, team: 'red', row: f.row, col: f.col, hp: f.hp, maxHp: f.hp });
     }
 
-    this.placementQueue = ['blue', 'red'];
     this.placedCount = { blue: 0, red: 0 };
 
-    // Reset ready flags for re-use
+    // Reset ready flags
     for (const p of this.players.values()) p.ready = false;
 
-    this.log.push('Phase de placement commencée. Équipe bleue place en premier.');
-    this.broadcast('rb:state', this.publicState());
+    this.log.push('Phase de placement : chaque équipe place ses champions simultanément.');
+    this.broadcastPlacement();
+  }
+
+  // Send placement state per-player (hides enemy pieces)
+  broadcastPlacement() {
+    for (const [id, player] of this.players) {
+      const state = this.publicState();
+      // During placement, only show own pieces
+      state.pieces = state.pieces.filter(p => p.team === player.team);
+      player.socket.emit('rb:state', state);
+    }
   }
 
   placeChampion(playerId, championId, row, col) {
@@ -195,7 +204,7 @@ class RiftRoom {
     if (!player) return { error: 'Joueur introuvable' };
 
     const team = player.team;
-    if (this.placementQueue[0] !== team) return { error: "Ce n'est pas votre tour de placement" };
+    // Simultaneous placement: no turn restriction
 
     // Champion must be in their chosen list
     if (!player.chosenChampions.includes(championId)) return { error: 'Champion non choisi' };
@@ -239,7 +248,7 @@ class RiftRoom {
       alive: true,
       statuses: [],
       spellCooldowns: { s1: 0, s2: 0, ultim: 0 },
-      actedThisTurn: { moved: false, attacked: false, spelled: false },
+      actedThisTurn: { moveUsed: 0, attacked: false, spelled: false },
       hasShadow: false, shadowId: null,
       isAnchor: false,
       bastionActive: false, bastionTurns: 0,
@@ -251,21 +260,13 @@ class RiftRoom {
     this.pieces.set(piece.id, piece);
     this.placedCount[team]++;
 
-    // Alternate placement teams
-    if (this.placementQueue[0] === 'blue') {
-      this.placementQueue = ['red', 'blue'];
-    } else {
-      this.placementQueue = ['blue', 'red'];
-    }
-
     this.log.push(`${player.name} a placé ${champDef.name} en (${row},${col}).`);
-    this.broadcast('rb:state', this.publicState());
 
-    // Check if all placed
-    const allPlayers = [...this.players.values()];
-    const allPlaced = allPlayers.every(p => p.chosenChampions.length === this.placedCount[p.team]);
-    if (this.placedCount.blue === 5 && this.placedCount.red === 5) {
+    // If both teams placed all 5, start the game (reveal everything)
+    if (this.placedCount.blue >= 5 && this.placedCount.red >= 5) {
       this.startGame();
+    } else {
+      this.broadcastPlacement();
     }
 
     return { ok: true };
@@ -351,13 +352,10 @@ class RiftRoom {
     if (this.hasStatus(piece, 'immobilisé')) return 0;
     if (piece.isAnchor) return 0;
 
-    const champDef = CHAMPIONS[piece.championId];
-    const terrainCell = this.terrain[piece.row] ? this.terrain[piece.row][piece.col] : 'base';
-    const bonus = getTerrainBonus(champDef ? champDef.class : '', champDef ? champDef.element : '', terrainCell);
-
-    let move = piece.move - (bonus.movePenalty || 0);
+    let move = piece.move + (piece.bonusMove || 0);
     if (this.hasStatus(piece, 'ralenti')) move -= 1;
     if (this.hasStatus(piece, 'gelé')) move -= 1;
+    if (this.hasStatus(piece, 'invisible')) move = Math.min(move, 2);
 
     // Rohn mark bonus: +1 move for Rohn himself when marking
     if (piece.championId === 'rohn' && piece.markTarget) move += 1;
@@ -365,9 +363,11 @@ class RiftRoom {
     return Math.max(0, move);
   }
 
-  getReachableCells(piece) {
-    const moveRange = this.getEffectiveMoveRange(piece);
-    if (moveRange === 0) return [];
+  getReachableCells(piece, overrideRange = null) {
+    const effective = this.getEffectiveMoveRange(piece);
+    const used = piece.actedThisTurn?.moveUsed || 0;
+    const moveRange = overrideRange !== null ? overrideRange : Math.max(0, effective - used);
+    if (moveRange === 0) return { reachable: [], distMap: new Map() };
 
     // Dijkstra-style BFS — river costs 2 movement instead of 1
     const distMap = new Map();
@@ -379,7 +379,7 @@ class RiftRoom {
       const { r, c, d } = queue.shift();
       if ((distMap.get(`${r},${c}`) ?? Infinity) < d) continue; // stale entry
 
-      for (const [dr, dc] of DIRS_CARD) {
+      for (const [dr, dc] of DIRS8) {
         const nr = r + dr;
         const nc = c + dc;
         const key = `${nr},${nc}`;
@@ -413,7 +413,7 @@ class RiftRoom {
       }
     }
 
-    return [...reachableSet].map(k => k.split(',').map(Number));
+    return { reachable: [...reachableSet].map(k => k.split(',').map(Number)), distMap };
   }
 
   _getPieceAt(r, c) {
@@ -505,6 +505,13 @@ class RiftRoom {
     if (this.hasStatus(piece, 'bastion')) return 0;
     const actual = Math.max(0, Math.floor(amount));
     piece.hp -= actual;
+
+    // Losing invisibility when hit
+    if (actual > 0 && this.hasStatus(piece, 'invisible')) {
+      piece.statuses = piece.statuses.filter(s => s.name !== 'invisible');
+      this.log.push(`${this._pieceName(piece)} perd son invisibilité!`);
+    }
+
     if (piece.hp <= 0) {
       piece.hp = 0;
       this.killPiece(piece);
@@ -526,18 +533,21 @@ class RiftRoom {
     if (err) return { error: err };
 
     const piece = this.pieces.get(pieceId);
-    if (piece.actedThisTurn.moved) return { error: 'Déjà bougé ce tour' };
+    const effective = this.getEffectiveMoveRange(piece);
+    const used = piece.actedThisTurn?.moveUsed || 0;
+    if (effective - used <= 0) return { error: 'Plus de déplacement disponible' };
     if (this.hasStatus(piece, 'immobilisé') || this.hasStatus(piece, 'étourdi') || piece.isAnchor) {
       return { error: 'Ne peut pas se déplacer' };
     }
 
-    const reachable = this.getReachableCells(piece);
+    const { reachable, distMap } = this.getReachableCells(piece);
     const canReach = reachable.some(([r, c]) => r === targetRow && c === targetCol);
     if (!canReach) return { error: 'Cellule inaccessible' };
 
+    const moveCost = distMap.get(`${targetRow},${targetCol}`) || 1;
     piece.row = targetRow;
     piece.col = targetCol;
-    piece.actedThisTurn.moved = true;
+    piece.actedThisTurn.moveUsed = (piece.actedThisTurn.moveUsed || 0) + moveCost;
 
     // Check traps
     const triggeredTrap = this.traps.find(t =>
@@ -1160,21 +1170,33 @@ class RiftRoom {
       }
 
       case 'summon_shadow': {
-        if (caster.hasShadow) break; // Already has shadow
+        // If already has a shadow, redeploy it
+        if (caster.hasShadow && caster.shadowId) {
+          const existingShadow = this.pieces.get(caster.shadowId);
+          if (existingShadow && existingShadow.alive) {
+            existingShadow.row = targetRow;
+            existingShadow.col = targetCol;
+            this.log.push(`${this._pieceName(caster)} redéploie son ombre!`);
+            break;
+          }
+        }
         const shadowId = `${caster.team}_syal_shadow`;
+        const spawnRow = (typeof targetRow === 'number') ? targetRow : caster.row;
+        const spawnCol = (typeof targetCol === 'number') ? targetCol : caster.col;
         const shadow = {
           id: shadowId,
           championId: 'syal_shadow',
           team: caster.team,
-          row: caster.row, col: caster.col,
+          row: spawnRow, col: spawnCol,
           hp: 600, maxHp: 600,
-          atk: 180, arm: 0, rm: 0,
-          spd: 0, move: 0, atkRange: 1,
+          atk: Math.floor(caster.atk * 0.5), arm: 0, rm: 0,
+          spd: caster.spd, move: 2, atkRange: 1,
           alive: true,
           statuses: [],
-          spellCooldowns: { s1: 0, s2: 0, ultim: 0 },
-          actedThisTurn: { moved: false, attacked: false, spelled: false },
-          hasShadow: false, shadowId: null, isAnchor: true,
+          spellCooldowns: { s1: 0 },
+          actedThisTurn: { moveUsed: 0, attacked: false, spelled: false },
+          hasShadow: false, shadowId: null, isAnchor: false,
+          bonusMove: 0,
           bastionActive: false, bastionTurns: 0,
           rageActive: false, rageTurns: 0, rageKills: 0,
           markTarget: null, markTurns: 0, ultUsed: false,
@@ -1253,7 +1275,7 @@ class RiftRoom {
         deadPiece.col = targetCol;
         deadPiece.alive = true;
         deadPiece.statuses = [];
-        deadPiece.actedThisTurn = { moved: false, attacked: false, spelled: false };
+        deadPiece.actedThisTurn = { moveUsed: 0, attacked: false, spelled: false };
         // Re-insert in turnOrder
         if (!this.turnOrder.includes(deadPiece.id)) {
           this.turnOrder.push(deadPiece.id);
@@ -1403,6 +1425,54 @@ class RiftRoom {
         break;
       }
 
+      case 'kill_self': {
+        if (!caster.alive) break;
+        caster.alive = false;
+        caster.hp = 0;
+        // Update owner's hasShadow
+        for (const p of this.pieces.values()) {
+          if (p.shadowId === caster.id) {
+            p.hasShadow = false;
+            p.shadowId = null;
+          }
+        }
+        this.log.push(`L'ombre se dissout.`);
+        break;
+      }
+
+      case 'caster_move_to_line_end': {
+        // Move caster to farthest unblocked cell in targets (line spell)
+        for (let i = targets.length - 1; i >= 0; i--) {
+          const cell = targets[i];
+          const blocker = this._getPieceAt(cell.row, cell.col);
+          const fountain = this._getFountainAt(cell.row, cell.col);
+          const wall = this.walls.some(w => w.r === cell.row && w.c === cell.col);
+          if (!blocker && !fountain && !wall) {
+            caster.row = cell.row;
+            caster.col = cell.col;
+            this.log.push(`${this._pieceName(caster)} termine sa charge en (${cell.row},${cell.col}).`);
+            break;
+          }
+        }
+        break;
+      }
+
+      case 'bonus_move': {
+        caster.bonusMove = (caster.bonusMove || 0) + (effect.amount || 2);
+        this.log.push(`${this._pieceName(caster)} se prépare à foncer (+${effect.amount || 2} déplacement)!`);
+        break;
+      }
+
+      case 'self_debuff_armor': {
+        // Temporary ARM/RM reduction (tracked as a status)
+        const pct = effect.percent || 0.25;
+        caster.arm = Math.floor(caster.arm * (1 - pct));
+        caster.rm  = Math.floor(caster.rm  * (1 - pct));
+        this.addStatus(caster, 'rush_debuff', effect.duration || 1);
+        this.log.push(`${this._pieceName(caster)} perd ${Math.round(pct*100)}% ARM/RM jusqu'au prochain tour.`);
+        break;
+      }
+
       default:
         // Unknown effect type, skip
         break;
@@ -1466,7 +1536,8 @@ class RiftRoom {
       });
 
       // Reset actedThisTurn
-      currentPiece.actedThisTurn = { moved: false, attacked: false, spelled: false };
+      currentPiece.actedThisTurn = { moveUsed: 0, attacked: false, spelled: false };
+      currentPiece.bonusMove = 0;
     }
 
     // Reduce wall/trap/trail durations

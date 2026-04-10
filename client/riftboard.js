@@ -21,7 +21,7 @@ const S = {
 // Champion definitions (mirrored from server for display)
 const CHAMPIONS = {
   karek:  { name:'Karek',  title:'Le Brise-Ligne',         class:'Tank-Guerrier', element:'terre',   emoji:'🪨', spd:2,
-    s1:{name:'Charge Tellurique',   desc:'Fonce en ligne droite sur 4 cases, renverse les ennemis.'},
+    s1:{name:'Charge Tellurique',   desc:'Fonce en ligne droite sur 4 cases, repousse les ennemis sur le côté. Karek avance jusqu\'à la dernière case libre.'},
     s2:{name:'Frappe Sismique',     desc:'Frappe en arc avant, ralentit les ennemis 1 tour.'},
     u:{name:'Pilier de Terre',      desc:'Immobile 2 tours, renvoie 40% des dégâts.'},
     stats:{hp:2800,atk:220,arm:60,rm:30,spd:2,move:2,atkRange:1} },
@@ -31,9 +31,9 @@ const CHAMPIONS = {
     u:{name:'Lame du Néant',        desc:'Ignore l\'armure. Exécute si cible < 35% PV.'},
     stats:{hp:1300,atk:280,arm:20,rm:25,spd:5,move:3,atkRange:1} },
   syal:   { name:'Syal',   title:'Le Tisserand d\'Ombre',   class:'Mage',          element:'ombre',   emoji:'🌑', spd:4,
-    s1:{name:'Voile Noir',          desc:'Invisible 1 tour + invoque une Ombre adjacente.'},
-    s2:{name:'Transposition',       desc:'Switch de position avec son Ombre.'},
-    u:{name:'Convergence',          desc:'Frappe avec l\'Ombre simultanément, ignore RM.'},
+    s1:{name:'Invocation d\'Ombre', desc:'Invoque une ombre spectrale sur la case ciblée (portée 2). L\'ombre peut se déplacer, attaquer (50% ATK) et utiliser Désincarnation pour se dissoudre.'},
+    s2:{name:'Transposition',       desc:'Échange instantanément sa position avec celle de l\'ombre invoquée.'},
+    u:{name:'Voile Noir',           desc:'Syal devient invisible pendant 1 tour (déplacement max 2 cases). L\'invisibilité est brisée si Syal est touché.'},
     stats:{hp:1600,atk:240,arm:25,rm:50,spd:4,move:3,atkRange:2} },
   velara: { name:'Vélara', title:'L\'Ensorcelleuse des Marées', class:'Mage-Support', element:'eau',  emoji:'🌊', spd:3,
     s1:{name:'Vague Horizontale',   desc:'Onde sur toute la rangée, pousse les ennemis.'},
@@ -47,11 +47,11 @@ const CHAMPIONS = {
     stats:{hp:1500,atk:260,arm:20,rm:45,spd:3,move:2,atkRange:2} },
   gorath: { name:'Gorath', title:'La Forteresse',            class:'Tank',          element:'terre',  emoji:'🏰', spd:1,
     s1:{name:'Mur de Pierre',       desc:'Crée un mur 3 cases horizontal, bloque 2 tours.'},
-    s2:{name:'Provocation',         desc:'Force ennemis rayon 2 à le cibler 1 tour.'},
+    s2:{name:'Rush de Forteresse',  desc:'+4 déplacement ce tour, -25% ARM/RM jusqu\'au prochain tour.'},
     u:{name:'Bastion Absolu',       desc:'Invulnérable 2 tours, renvoie 50% des dégâts.'},
-    stats:{hp:3800,atk:180,arm:90,rm:60,spd:1,move:1,atkRange:1} },
+    stats:{hp:3800,atk:180,arm:90,rm:60,spd:1,move:2,atkRange:1} },
   aelys:  { name:'Aelys',  title:'La Gardienne',             class:'Support',       element:'lumière',emoji:'✨', spd:3,
-    s1:{name:'Rayon de Soin',       desc:'Ligne 3 cases: soigne allié 350 PV ou blesse ennemi.'},
+    s1:{name:'Rayon de Soin',       desc:'Soin ciblé à portée 3 : soigne un allié (350 PV) ou blesse un ennemi (200 PV).'},
     s2:{name:'Croix de Lumière',    desc:'Diagonales: soigne alliés 150 PV, blesse ennemis.'},
     u:{name:'Renaissance',          desc:'Ressuscite un allié éliminé avec 600 PV. (1×/game)'},
     stats:{hp:1400,atk:160,arm:35,rm:65,spd:3,move:2,atkRange:2} },
@@ -70,6 +70,10 @@ const CHAMPIONS = {
     s2:{name:'Dash Électrique',     desc:'Dash diagonal 3 cases, traînée électrique derrière.'},
     u:{name:'Tempête Convergente',  desc:'Éclairs 8 directions, 300 dégâts. Étourdi 1 tour après.'},
     stats:{hp:1800,atk:210,arm:35,rm:45,spd:4,move:3,atkRange:2} },
+  syal_shadow: { name:'Ombre', title:'Projection Spectrale', class:'Mage', element:'ombre', emoji:'👤', spd:4,
+    s1:{name:'Désincarnation', desc:'Dissout l\'ombre immédiatement.'},
+    s2:{name:'',desc:''}, u:{name:'',desc:''},
+    stats:{hp:600,atk:120,arm:0,rm:0,spd:4,move:2,atkRange:1} },
 };
 
 const CHAMPION_LIST = ['karek','lysha','syal','velara','pyrox','gorath','aelys','rohn','vek','zhen'];
@@ -265,7 +269,7 @@ el('btn-confirm-draft').onclick = () => {
 
 // ── Placement ──────────────────────────────────────────────────
 function renderPlacementScreen(state) {
-  el('placement-subtitle').textContent = `Tour de placement: équipe ${state.placementTeam === S.myTeam ? 'VOTRE' : 'adverse'}`;
+  el('placement-subtitle').textContent = 'Placez vos 5 champions dans votre base';
   buildBoard('board-placement', state, 'placement');
   renderPlacementQueue(state);
 }
@@ -279,7 +283,7 @@ function renderPlacementQueue(state) {
   queue.innerHTML = me.chosenChampions.map(id => {
     const c = CHAMPIONS[id];
     const isPlaced = placed.includes(id);
-    const isActive = S.placingChampionId === id && state.placementTeam === S.myTeam;
+    const isActive = S.placingChampionId === id;
     return `<div class="pq-item ${isActive?'active-place':''} ${isPlaced?'placed':''}" onclick="selectForPlacement('${id}')">
       <span class="pq-emoji">${c.emoji}</span>
       <span class="pq-name">${c.name}</span>
@@ -289,7 +293,7 @@ function renderPlacementQueue(state) {
 }
 
 function selectForPlacement(id) {
-  if (!S.gameState || S.gameState.placementTeam !== S.myTeam) return;
+  if (!S.gameState) return;
   const placed = S.gameState.pieces.filter(p => p.team === S.myTeam).map(p => p.championId);
   if (placed.includes(id)) return;
   S.placingChampionId = id;
@@ -387,6 +391,22 @@ function buildBoard(boardId, state, mode = 'game') {
       board.appendChild(cell);
     }
   }
+
+  // Highlight valid placement zones during placement phase
+  if (mode === 'placement') {
+    const validRows = S.myTeam === 'blue' ? [11, 12] : [0, 1];
+    for (let r = 0; r < (state.terrain?.length || 13); r++) {
+      for (let c = 0; c < 13; c++) {
+        if (validRows.includes(r)) {
+          const idx = r * 13 + c;
+          const cell = board.children[idx];
+          if (cell && !cell.querySelector('.piece') && !cell.querySelector('.fountain-obj')) {
+            cell.classList.add('highlight-place');
+          }
+        }
+      }
+    }
+  }
 }
 
 function getCellTerrain(state, r, c) {
@@ -409,7 +429,7 @@ function getCellEl(boardId, r, c) {
 // ── Highlights ──────────────────────────────────────────────────
 function clearHighlights(boardId) {
   document.querySelectorAll(`#${boardId} .cell`).forEach(c => {
-    c.classList.remove('highlight-move','highlight-attack','highlight-spell','highlight-place','selected-cell');
+    c.classList.remove('highlight-move','highlight-attack','highlight-attack-range','highlight-spell','highlight-place','selected-cell');
   });
 }
 
@@ -468,7 +488,7 @@ function onPieceClick(piece, cellEl, r, c, mode) {
 function onCellClick(r, c, mode) {
   if (mode === 'placement') {
     if (!S.placingChampionId) return;
-    if (!S.gameState || S.gameState.placementTeam !== S.myTeam) return;
+    if (!S.gameState) return;
     socket.emit('rb:place', { championId: S.placingChampionId, row: r, col: c });
     return;
   }
@@ -553,7 +573,8 @@ function renderActionPanel(piece) {
   const isStunned = (piece.statuses||[]).some(s => s.name === 'étourdi');
   const isAnchor = piece.isAnchor;
 
-  el('act-move').className = `act-btn ${acted.moved||isAnchor||isStunned?'done':''}`;
+  const effectiveMoveLeft = getEffectiveMove(piece, S.gameState);
+  el('act-move').className = `act-btn ${(effectiveMoveLeft <= 0)||isAnchor||isStunned?'done':''}`;
   el('act-attack').className = `act-btn ${acted.attacked||isStunned?'done':''}`;
   el('act-end').className = 'act-btn btn-end-turn';
 
@@ -573,6 +594,9 @@ function renderActionPanel(piece) {
     const spellLabel = sp.key==='ultim' ? 'Ultim' : sp.key==='s1' ? 'Sort 1' : 'Sort 2';
     const shortDesc = (sp.def?.desc || '').slice(0, 42) + ((sp.def?.desc||'').length > 42 ? '…' : '');
     btn.innerHTML = `${spellIcon} ${spellLabel}<span class="spell-label">${sp.def?.name||''}</span><span class="spell-desc-mini">${shortDesc}</span>${onCd ? `<span class="spell-cd-badge">(${sp.cd} tours)</span>` : ''}`;
+    // Tooltip on hover
+    btn.addEventListener('mouseenter', () => showSpellTooltip(btn, sp.def, sp.cd));
+    btn.addEventListener('mouseleave', hideSpellTooltip);
   });
 }
 
@@ -601,6 +625,26 @@ function showHoveredPiece(piece) {
 }
 function hideHoveredPiece() {
   el('hovered-piece-panel').style.display = 'none';
+}
+
+// ── Spell tooltip ───────────────────────────────────────────────
+let _spellTip = null;
+function showSpellTooltip(btn, spellDef, cd) {
+  if (!spellDef) return;
+  hideSpellTooltip();
+  const tip = document.createElement('div');
+  tip.className = 'spell-tooltip-popup';
+  const cdText = cd > 0 ? `<div class="stp-stats">⏳ Recharge: <span class="stp-key">${cd} tours</span></div>` : '';
+  tip.innerHTML = `<div class="stp-title">${spellDef.name || ''}</div><div class="stp-desc">${spellDef.desc || ''}</div>${cdText}`;
+  document.body.appendChild(tip);
+  _spellTip = tip;
+  // Position above button
+  const r = btn.getBoundingClientRect();
+  tip.style.left = Math.max(4, r.left - 10) + 'px';
+  tip.style.top  = Math.max(4, r.top - tip.offsetHeight - 8) + 'px';
+}
+function hideSpellTooltip() {
+  if (_spellTip) { _spellTip.remove(); _spellTip = null; }
 }
 
 // ── Turn order bar ─────────────────────────────────────────────
@@ -654,7 +698,7 @@ function renderLog(state) {
 function setupActionButtons() {
   el('act-move').onclick = () => {
     const cp = getCurrentPiece();
-    if (!cp || cp.actedThisTurn?.moved || isAnchorOrStunned(cp)) return;
+    if (!cp || getEffectiveMove(cp, S.gameState) <= 0 || isAnchorOrStunned(cp)) return;
     S.selectedAction = S.selectedAction === 'move' ? null : 'move';
     if (S.selectedAction === 'move') {
       clearHighlights('board-game');
@@ -774,38 +818,49 @@ function getClientReachable(piece, state) {
 }
 
 function getEffectiveMove(piece, state) {
-  let m = piece.move;
   const statuses = piece.statuses || [];
   if (statuses.some(s => s.name === 'immobilisé')) return 0;
   if (statuses.some(s => s.name === 'étourdi')) return 0;
   if (piece.isAnchor) return 0;
+  let m = piece.move + (piece.bonusMove || 0);
   if (statuses.some(s => s.name === 'ralenti')) m--;
   if (statuses.some(s => s.name === 'gelé')) m--;
-  return Math.max(1, m);
+  if (statuses.some(s => s.name === 'invisible')) m = Math.min(m, 2);
+  const used = piece.actedThisTurn?.moveUsed || 0;
+  return Math.max(0, m - used);
 }
 
 // ── Attack highlights ──────────────────────────────────────────
 function showAttackHighlights(piece) {
   if (!S.gameState) return;
-  const cells = [];
+  const ROWS = S.gameState.terrain ? S.gameState.terrain.length : 13;
+  const rangeCells = [];
+  const targetCells = [];
 
-  // Enemy pieces in atkRange
+  // All cells in attack range (visual indicator)
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < 13; c++) {
+      if (chebyshev(piece.row, piece.col, r, c) <= piece.atkRange && (r !== piece.row || c !== piece.col)) {
+        rangeCells.push([r, c]);
+      }
+    }
+  }
+  highlightCells('board-game', rangeCells, 'attack-range');
+
+  // Actual attackable targets
   S.gameState.pieces.forEach(p => {
     if (!p.alive || p.team === piece.team) return;
-    if (chebyshev(piece.row,piece.col,p.row,p.col) <= piece.atkRange) {
-      cells.push([p.row, p.col]);
+    if (chebyshev(piece.row, piece.col, p.row, p.col) <= piece.atkRange) {
+      targetCells.push([p.row, p.col]);
     }
   });
-
-  // Enemy fountains in atkRange
-  (S.gameState.fountains||[]).forEach(f => {
+  (S.gameState.fountains || []).forEach(f => {
     if (f.team === piece.team || f.hp <= 0) return;
-    if (chebyshev(piece.row,piece.col,f.row,f.col) <= piece.atkRange) {
-      cells.push([f.row, f.col]);
+    if (chebyshev(piece.row, piece.col, f.row, f.col) <= piece.atkRange) {
+      targetCells.push([f.row, f.col]);
     }
   });
-
-  highlightCells('board-game', cells, 'attack');
+  highlightCells('board-game', targetCells, 'attack');
 }
 
 // ── Spell highlights (simplified) ─────────────────────────────
@@ -826,7 +881,7 @@ function showSpellHighlights(piece, spellKey) {
     dirs.forEach(([dr,dc]) => {
       for (let i=1; i<=range; i++) {
         const nr=piece.row+dr*i, nc=piece.col+dc*i;
-        if (nr<0||nr>=9||nc<0||nc>=13) break;
+        if (nr<0||nr>=13||nc<0||nc>=13) break;
         cells.push([nr,nc]);
         const hasPiece = S.gameState.pieces.find(p=>p.row===nr&&p.col===nc&&p.alive);
         if (hasPiece) break; // line stops at first target
@@ -837,7 +892,7 @@ function showSpellHighlights(piece, spellKey) {
     [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
       for (let i=1; i<=range; i++) {
         const nr=piece.row+dr*i, nc=piece.col+dc*i;
-        if (nr<0||nr>=9||nc<0||nc>=13) break;
+        if (nr<0||nr>=13||nc<0||nc>=13) break;
         cells.push([nr,nc]);
       }
     });
@@ -847,14 +902,14 @@ function showSpellHighlights(piece, spellKey) {
     [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
       for (let i=(minR||1); i<=range; i++) {
         const nr=piece.row+dr*i, nc=piece.col+dc*i;
-        if (nr<0||nr>=9||nc<0||nc>=13) break;
+        if (nr<0||nr>=13||nc<0||nc>=13) break;
         cells.push([nr,nc]);
       }
     });
   } else if (spellTargeting === 'adjacent' || spellTargeting === 'front_arc') {
     [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
       const nr=piece.row+dr, nc=piece.col+dc;
-      if (nr>=0&&nr<9&&nc>=0&&nc<13) cells.push([nr,nc]);
+      if (nr>=0&&nr<13&&nc>=0&&nc<13) cells.push([nr,nc]);
     });
   } else if (spellTargeting === 'single' || spellTargeting === 'dead_ally') {
     const range = getSpellRange(champId, spellKey);
@@ -874,7 +929,7 @@ function showSpellHighlights(piece, spellKey) {
     [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
       for (let i=1; i<=range; i++) {
         const nr=piece.row+dr*i, nc=piece.col+dc*i;
-        if (nr>=0&&nr<9&&nc>=0&&nc<13) cells.push([nr,nc]);
+        if (nr>=0&&nr<13&&nc>=0&&nc<13) cells.push([nr,nc]);
       }
     });
   } else {
@@ -884,7 +939,7 @@ function showSpellHighlights(piece, spellKey) {
       for (let dc=-range; dc<=range; dc++) {
         if (dr===0&&dc===0) continue;
         const nr=piece.row+dr, nc=piece.col+dc;
-        if (nr>=0&&nr<9&&nc>=0&&nc<13) cells.push([nr,nc]);
+        if (nr>=0&&nr<13&&nc>=0&&nc<13) cells.push([nr,nc]);
       }
     }
   }
@@ -896,11 +951,11 @@ function getSpellTargeting(champId, spellKey) {
   const spellMap = {
     karek:  {s1:'line', s2:'front_arc', ultim:'self'},
     lysha:  {s1:'diag_jump', s2:'all_diag', ultim:'adjacent'},
-    syal:   {s1:'adjacent', s2:'shadow', ultim:'single'},
+    syal:   {s1:'single', s2:'shadow', ultim:'self'},
     velara: {s1:'full_row', s2:'aoe_self', ultim:'line'},
     pyrox:  {s1:'line', s2:'all_diag', ultim:'self'},
     gorath: {s1:'adjacent', s2:'self', ultim:'self'},
-    aelys:  {s1:'line', s2:'all_diag', ultim:'dead_ally'},
+    aelys:  {s1:'single', s2:'all_diag', ultim:'dead_ally'},
     rohn:   {s1:'line', s2:'two_diag_place', ultim:'single'},
     vek:    {s1:'adjacent', s2:'front_arc', ultim:'self'},
     zhen:   {s1:'line', s2:'diag_jump', ultim:'self'},
@@ -910,7 +965,7 @@ function getSpellTargeting(champId, spellKey) {
 function getSpellRange(champId, spellKey) {
   const rangeMap = {
     karek:{s1:4,s2:2,ultim:0}, lysha:{s1:3,s2:2,ultim:1},
-    syal:{s1:1,s2:99,ultim:4}, velara:{s1:12,s2:3,ultim:5},
+    syal:{s1:2,s2:99,ultim:0}, velara:{s1:12,s2:3,ultim:5},
     pyrox:{s1:6,s2:4,ultim:3}, gorath:{s1:2,s2:2,ultim:0},
     aelys:{s1:3,s2:2,ultim:99}, rohn:{s1:7,s2:3,ultim:99},
     vek:{s1:1,s2:1,ultim:0}, zhen:{s1:5,s2:3,ultim:4},
@@ -982,6 +1037,17 @@ el('btn-surrender')?.addEventListener('click', () => {
 });
 
 // ── Animation state ────────────────────────────────────────────
+let prevCurrentPieceId = null;
+
+function showTurnBanner(emoji, name, isMyTurn) {
+  const b = document.getElementById('turn-banner');
+  if (!b) return;
+  b.className = 'turn-banner' + (isMyTurn ? '' : ' enemy-turn');
+  b.innerHTML = `<span class="tb-emoji">${emoji}</span><div><div class="tb-name">${name}</div><div class="tb-label">${isMyTurn ? '⚔️ Votre tour !' : '🛡️ Tour adverse'}</div></div>`;
+  b.classList.add('show');
+  setTimeout(() => { b.classList.remove('show'); }, 2100);
+}
+
 let prevPieceHPs = new Map(); // pieceId → hp  (for hit detection)
 let pendingAttackAnim = null; // { attackerId, targetRow, targetCol }
 
@@ -1054,6 +1120,15 @@ socket.on('rb:state', (state) => {
 
   S.gameState = state;
   S.myTeam = state.players.find(p => p.id === S.myId)?.team || S.myTeam;
+
+  // Turn change banner
+  if (state.phase === 'playing' && state.currentPieceId && state.currentPieceId !== prevCurrentPieceId) {
+    prevCurrentPieceId = state.currentPieceId;
+    const cp = state.pieces?.find(p => p.id === state.currentPieceId);
+    const def = CHAMPIONS[cp?.championId] || {};
+    const isMyTurn = cp?.team === S.myTeam;
+    showTurnBanner(def.emoji || '⚔️', def.name || cp?.championId || '?', isMyTurn);
+  }
 
   if (state.phase === 'lobby' || state.phase === 'draft' && !el('screen-draft').classList.contains('active')) {
     if (state.phase === 'lobby') {
