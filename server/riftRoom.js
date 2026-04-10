@@ -103,6 +103,19 @@ class RiftRoom {
     }
   }
 
+  rejoinPlayer(oldId, newSocket) {
+    const player = this.players.get(oldId);
+    if (!player) return { error: 'Joueur introuvable (reconnexion impossible)' };
+    const newId = newSocket.id;
+    player.id = newId;
+    player.socket = newSocket;
+    this.players.delete(oldId);
+    this.players.set(newId, player);
+    if (this.hostId === oldId) this.hostId = newId;
+    this.log.push(`${player.name} s'est reconnecté.`);
+    return { ok: true, player };
+  }
+
   broadcast(event, data) {
     for (const p of this.players.values()) p.socket.emit(event, data);
   }
@@ -287,7 +300,7 @@ class RiftRoom {
     });
     this.turnOrder = alivePieces.map(p => p.id);
 
-    this.log.push('Partie commencée! Tour 1');
+    this.log.push(`🎮 Partie lancée ! Ordre de jeu : ${this.turnOrder.map(id => { const p = this.pieces.get(id); return this._pieceName(p); }).join(' → ')}`);
     this.broadcast('rb:state', this.publicState());
   }
 
@@ -379,7 +392,7 @@ class RiftRoom {
       const { r, c, d } = queue.shift();
       if ((distMap.get(`${r},${c}`) ?? Infinity) < d) continue; // stale entry
 
-      for (const [dr, dc] of DIRS8) {
+      for (const [dr, dc] of DIRS_CARD) {   // était DIRS8
         const nr = r + dr;
         const nc = c + dc;
         const key = `${nr},${nc}`;
@@ -570,7 +583,7 @@ class RiftRoom {
       this.log.push(`${this._pieceName(piece)} traverse une traînée! (-${trailDmg} PV)`);
     }
 
-    this.log.push(`${this._pieceName(piece)} se déplace en (${targetRow},${targetCol}).`);
+    this.log.push(`🚶 ${this._pieceName(piece)} se déplace en (${targetRow},${targetCol}) [coût:${moveCost}, restant:${Math.max(0,effective-piece.actedThisTurn.moveUsed)}].`);
     this.broadcast('rb:state', this.publicState());
     return { ok: true };
   }
@@ -643,7 +656,7 @@ class RiftRoom {
       }
 
       const actualDmg = this._applyDamage(targetPiece, effectiveDmg);
-      this.log.push(`${this._pieceName(piece)} attaque ${this._pieceName(targetPiece)} pour ${actualDmg} dégâts.`);
+      this.log.push(`⚔️ ${this._pieceName(piece)} attaque ${this._pieceName(targetPiece)} → ${actualDmg} dégâts (PV restant: ${targetPiece.hp}).`);
 
       // Vek rage splash: also hit 2 diagonal-front cells
       if (piece.rageActive && targetPiece.alive !== false) {
@@ -728,7 +741,7 @@ class RiftRoom {
       piece.ultUsed = true;
     }
 
-    this.log.push(`${this._pieceName(piece)} lance ${spell.name}!`);
+    this.log.push(`✨ ${this._pieceName(piece)} lance [${spell.name}]!`);
     this.broadcast('rb:state', this.publicState());
     return { ok: true };
   }
@@ -1538,6 +1551,7 @@ class RiftRoom {
       // Reset actedThisTurn
       currentPiece.actedThisTurn = { moveUsed: 0, attacked: false, spelled: false };
       currentPiece.bonusMove = 0;
+      this.log.push(`--- Tour de ${this._pieceName(currentPiece)} terminé.`);
     }
 
     // Reduce wall/trap/trail durations
@@ -1675,7 +1689,7 @@ class RiftRoom {
       if (shadow && shadow.alive) this.killPiece(shadow);
     }
 
-    this.log.push(`${this._pieceName(piece)} a été éliminé!`);
+    this.log.push(`💀 ${this._pieceName(piece)} a été éliminé!`);
     this.checkWinCondition();
   }
 

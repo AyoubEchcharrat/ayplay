@@ -25,6 +25,7 @@
     <p class="avatar-label">Avatar</p>
     <div class="avatar-grid" id="avatar-grid"></div>
     <div id="panel-join">
+      <button class="btn btn-sm" id="btn-random-join" type="button" style="margin-bottom:8px">🎲 Pseudo aléatoire</button>
       <label>Pseudo</label>
       <input id="inp-name-join" type="text" placeholder="Ton pseudo" maxlength="20" autocomplete="off"/>
       <label>Code de room</label>
@@ -32,6 +33,7 @@
       <button class="btn btn-primary" id="btn-join">Rejoindre</button>
     </div>
     <div id="panel-create" style="display:none">
+      <button class="btn btn-sm" id="btn-random-create" type="button" style="margin-bottom:8px">🎲 Pseudo aléatoire</button>
       <label>Pseudo</label>
       <input id="inp-name-create" type="text" placeholder="Ton pseudo" maxlength="20" autocomplete="off"/>
       <button class="btn btn-primary" id="btn-create">Créer une room</button>
@@ -45,7 +47,7 @@
   <h2 class="logo" style="font-size:1.8rem">Rift<span>Board</span></h2>
   <div class="room-code-display">
     <div class="code-label">Code de room</div>
-    <div class="code" id="waiting-code">------</div>
+    <div class="code" id="waiting-code" style="cursor:pointer" title="Cliquer pour copier">------</div>
   </div>
   <div class="card" style="max-width:500px">
     <div id="waiting-players" class="players-list"></div>
@@ -142,12 +144,6 @@
         <div id="hovered-piece-info"></div>
       </div>
 
-      <!-- Fountain status -->
-      <div class="sb-section">
-        <div class="sb-title">Fontaines</div>
-        <div id="fountain-status"></div>
-      </div>
-
       <!-- Log -->
       <div class="sb-section sb-log">
         <div class="sb-title">Journal</div>
@@ -170,6 +166,31 @@
 
 <!-- Turn announcement banner -->
 <div id="turn-banner" class="turn-banner"></div>
+
+<!-- Champion detail modal -->
+<div id="champ-modal-overlay" class="champ-modal-overlay" style="display:none" onclick="closeChampModal()">
+  <div class="champ-modal" onclick="event.stopPropagation()">
+    <button class="champ-modal-close" onclick="closeChampModal()">✕</button>
+    <div class="cm-header">
+      <div class="cm-img-wrap" id="cm-img"></div>
+      <div class="cm-title-block">
+        <div class="cm-name" id="cm-name"></div>
+        <div class="cm-title" id="cm-title-text"></div>
+        <div class="cm-class" id="cm-class"></div>
+        <div class="cm-hp-bar-wrap">
+          <div class="cm-hp-bar"><div class="cm-hp-fill" id="cm-hp-fill"></div></div>
+          <span class="cm-hp-text" id="cm-hp-text"></span>
+        </div>
+      </div>
+    </div>
+    <div class="cm-tabs">
+      <button class="cm-tab active" id="cm-tab-stats" onclick="switchCmTab('stats')">📊 Stats</button>
+      <button class="cm-tab" id="cm-tab-spells" onclick="switchCmTab('spells')">✨ Sorts</button>
+    </div>
+    <div class="cm-body" id="cm-body-stats"></div>
+    <div class="cm-body" id="cm-body-spells" style="display:none"></div>
+  </div>
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="riftboard.js"></script>

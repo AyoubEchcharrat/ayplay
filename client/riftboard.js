@@ -4,6 +4,17 @@
 
 const socket = io('/rb');
 
+// ── Reconnexion automatique ────────────────────────────────────
+socket.on('connect', () => {
+  const savedRoom = sessionStorage.getItem('rb_room');
+  const savedId   = sessionStorage.getItem('rb_myId');
+  if (savedRoom && savedId && savedId !== socket.id && S.phase !== 'lobby') {
+    socket.emit('rb:rejoin', { roomCode: savedRoom, previousId: savedId });
+  }
+});
+socket.on('rb:reconnected',         ({ message }) => showToast(message, 'success'));
+socket.on('rb:player_disconnected', ({ message }) => showToast(message, 'warn'));
+
 // ── State ──────────────────────────────────────────────────────
 const S = {
   myId: null,
@@ -21,7 +32,7 @@ const S = {
 // Champion definitions (mirrored from server for display)
 const CHAMPIONS = {
   karek:  { name:'Gavik',  title:'Le Brise-Ligne',         class:'Tank-Guerrier', element:'terre',   emoji:'🪨', spd:2,
-    s1:{name:'Charge Tellurique',   desc:'Fonce en ligne droite sur 4 cases, repousse les ennemis sur le côté. Gavik avance jusqu\'à la dernière case libre.'},
+    s1:{name:'Charge Tellurique',   desc:'Fonce en ligne droite sur 4 cases, repousse les ennemis sur le côté et les embrase par friction.'},
     s2:{name:'Frappe Sismique',     desc:'Frappe en arc avant, ralentit les ennemis 1 tour.'},
     u:{name:'Pilier de Terre',      desc:'Immobile 2 tours, renvoie 40% des dégâts.'},
     stats:{hp:2800,atk:220,arm:60,rm:30,spd:2,move:2,atkRange:1} },
@@ -46,7 +57,7 @@ const CHAMPIONS = {
     u:{name:'Éruption',             desc:'Explosion rayon 3: 500 dégâts à tous, -200 PV soi.'},
     stats:{hp:1500,atk:260,arm:20,rm:45,spd:3,move:2,atkRange:2} },
   gorath: { name:'Gorath', title:'La Forteresse',            class:'Tank',          element:'terre',  emoji:'🏰', spd:1,
-    s1:{name:'Mur de Pierre',       desc:'Crée un mur 3 cases horizontal, bloque 2 tours.'},
+    s1:{name:'Mur de Pierre',       desc:'Érige un mur de 3 cases de large pendant 5 tours.'},
     s2:{name:'Rush de Forteresse',  desc:'+4 déplacement ce tour, -25% ARM/RM jusqu\'au prochain tour.'},
     u:{name:'Bastion Absolu',       desc:'Invulnérable 2 tours, renvoie 50% des dégâts.'},
     stats:{hp:3800,atk:180,arm:90,rm:60,spd:1,move:2,atkRange:1} },
@@ -61,7 +72,7 @@ const CHAMPIONS = {
     u:{name:'Traque Sans Fin',      desc:'Marque une cible 3 tours: +1 move vers elle, poison auto.'},
     stats:{hp:1900,atk:230,arm:40,rm:35,spd:4,move:3,atkRange:3} },
   vek:    { name:'Vek',    title:'La Bête des Profondeurs',  class:'Tank-Bruiser',  element:'bête',   emoji:'🦷', spd:2,
-    s1:{name:'Morsure Voraces',     desc:'Mêlée: vole 30% dégâts en PV (60% si cible saigne).'},
+    s1:{name:'Morsure Vorace',      desc:'Morsure adjacente : dégâts + saignement 3 tours + vol de vie (30%, 60% si cible saigne déjà).'},
     s2:{name:'Rugissement',         desc:'3 cases devant: repousse les ennemis d\'1 case.'},
     u:{name:'Rage des Abysses',     desc:'2 tours: attaques frappent aussi 2 diagonales avant.'},
     stats:{hp:2600,atk:250,arm:55,rm:40,spd:2,move:2,atkRange:1} },
@@ -475,6 +486,13 @@ function onPieceClick(piece, cellEl, r, c, mode) {
     return;
   }
   if (mode !== 'game') return;
+
+  // Clic sans action : ouvrir modal champion
+  if (!S.selectedAction) {
+    openChampModal(piece);
+    return;
+  }
+
   if (!isMyTurn()) return;
 
   const cp = getCurrentPiece();
@@ -482,6 +500,16 @@ function onPieceClick(piece, cellEl, r, c, mode) {
 
   // If it's not my active piece being clicked, check if it's an attack target
   if (piece.id === cp.id) {
+    if (S.selectedAction && ['s1','s2','ultim'].includes(S.selectedAction)) {
+      const targeting = getSpellTargeting(cp.championId, S.selectedAction);
+      if (targeting === 'self' || targeting === 'aoe_self') {
+        triggerSpellAnim(cp.championId, S.selectedAction, cp, r, c);
+        socket.emit('rb:spell', { pieceId: cp.id, spellKey: S.selectedAction, targetRow: r, targetCol: c });
+        S.selectedAction = null;
+        clearHighlights('board-game');
+        return;
+      }
+    }
     // Select my active piece again → show actions
     S.activePieceId = piece.id;
     renderActionPanel(cp);
@@ -499,6 +527,7 @@ function onPieceClick(piece, cellEl, r, c, mode) {
     return;
   }
   if (['s1','s2','ultim'].includes(S.selectedAction) && piece.alive) {
+    triggerSpellAnim(cp.championId, S.selectedAction, cp, r, c);
     socket.emit('rb:spell', { pieceId: cp.id, spellKey: S.selectedAction, targetRow: r, targetCol: c });
     S.selectedAction = null;
     clearHighlights('board-game');
@@ -506,6 +535,7 @@ function onPieceClick(piece, cellEl, r, c, mode) {
   }
   if (S.selectedAction === 'ultim' && !piece.alive && piece.team === S.myTeam) {
     // Aelys resurrection targets dead ally
+    triggerSpellAnim(cp.championId, 'ultim', cp, r, c);
     socket.emit('rb:spell', { pieceId: cp.id, spellKey: 'ultim', targetRow: r, targetCol: c });
     S.selectedAction = null;
     clearHighlights('board-game');
@@ -549,6 +579,7 @@ function onCellClick(r, c, mode) {
   }
 
   if (['s1','s2','ultim'].includes(S.selectedAction) && cellEl?.classList.contains('highlight-spell')) {
+    triggerSpellAnim(cp.championId, S.selectedAction, cp, r, c);
     socket.emit('rb:spell', { pieceId: cp.id, spellKey: S.selectedAction, targetRow: r, targetCol: c });
     S.selectedAction = null;
     clearHighlights('board-game');
@@ -559,6 +590,13 @@ function onCellClick(r, c, mode) {
   if (S.selectedAction) {
     S.selectedAction = null;
     clearHighlights('board-game');
+  } else {
+    // Afficher info terrain si case vide
+    const piece = S.gameState?.pieces?.find(p => p.row === r && p.col === c && p.alive);
+    if (!piece) {
+      const t = getCellTerrain(S.gameState, r, c);
+      showTerrainToast(t);
+    }
   }
 }
 
@@ -632,14 +670,18 @@ function renderActionPanel(piece) {
 function showHoveredPiece(piece) {
   const champDef = CHAMPIONS[piece.championId] || {};
   el('hovered-piece-panel').style.display = '';
-  const pct = piece.maxHp > 0 ? (piece.hp/piece.maxHp*100) : 0;
+  const pct = piece.maxHp > 0 ? (piece.hp / piece.maxHp * 100) : 0;
+  const barColor = pct > 60 ? 'var(--green)' : pct > 25 ? '#ffa502' : 'var(--red2)';
   el('hovered-piece-info').innerHTML = `
     <div class="hover-piece-card">
       <div class="hpc-header">
         <span class="hpc-emoji">${champVisual(piece.championId, champDef.emoji||'?', 'hpc-img')}</span>
-        <div>
+        <div style="flex:1">
           <div class="hpc-name">${champDef.name||piece.championId}</div>
           <div class="hpc-hp">❤️ ${piece.hp}/${piece.maxHp}</div>
+          <div style="height:5px;background:rgba(255,255,255,0.1);border-radius:3px;margin-top:3px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;transition:width 0.3s"></div>
+          </div>
         </div>
       </div>
       <div class="hpc-stats">
@@ -820,7 +862,7 @@ function getClientReachable(piece, state) {
     const { r, c, d } = queue.shift();
     if ((distMap.get(`${r},${c}`) ?? Infinity) < d) continue;
 
-    for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]]) {
+    for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
       const nr=r+dr, nc=c+dc;
       const key=`${nr},${nc}`;
       if (nr<0||nr>=ROWS||nc<0||nc>=13) continue;
@@ -942,10 +984,26 @@ function showSpellHighlights(piece, spellKey) {
     });
   } else if (spellTargeting === 'single' || spellTargeting === 'dead_ally') {
     const range = getSpellRange(champId, spellKey);
-    S.gameState.pieces.forEach(p => {
-      if (!p.alive && spellTargeting==='dead_ally' && p.team===piece.team) cells.push([p.row,p.col]);
-      else if (p.alive && spellTargeting==='single' && chebyshev(piece.row,piece.col,p.row,p.col)<=range) cells.push([p.row,p.col]);
-    });
+    const isSummon = (champId === 'syal' && spellKey === 's1');
+    if (isSummon) {
+      // Highlight toutes les cases vides à portée
+      for (let dr = -range; dr <= range; dr++) {
+        for (let dc = -range; dc <= range; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = piece.row + dr, nc = piece.col + dc;
+          if (nr < 0 || nr >= 13 || nc < 0 || nc >= 13) continue;
+          if (chebyshev(piece.row, piece.col, nr, nc) > range) continue;
+          const occupied = S.gameState.pieces.some(p => p.alive && p.row === nr && p.col === nc);
+          const isFountainCell = (S.gameState.fountains||[]).some(f => f.row === nr && f.col === nc);
+          if (!occupied && !isFountainCell) cells.push([nr, nc]);
+        }
+      }
+    } else {
+      S.gameState.pieces.forEach(p => {
+        if (!p.alive && spellTargeting==='dead_ally' && p.team===piece.team) cells.push([p.row,p.col]);
+        else if (p.alive && spellTargeting==='single' && chebyshev(piece.row,piece.col,p.row,p.col)<=range) cells.push([p.row,p.col]);
+      });
+    }
   } else if (spellTargeting === 'self' || spellTargeting === 'aoe_self') {
     // Target self — immediate activation
     cells.push([piece.row, piece.col]);
@@ -1024,7 +1082,6 @@ function renderGame(state) {
 
   buildBoard('board-game', state, 'game');
   renderTurnOrderBar(state);
-  renderFountainPanel(state);
   renderLog(state);
 
   el('game-round').textContent = `Tour ${state.round}`;
@@ -1115,11 +1172,187 @@ function triggerHitAnim(piece, dmg) {
   setTimeout(() => f.remove(), 950);
 }
 
+// ── Terrain toast ──────────────────────────────────────────────
+function showTerrainToast(terrain) {
+  const info = {
+    lane:    { e:'🟫', n:'Terrain neutre',   d:'Aucun bonus ni malus.' },
+    jungle:  { e:'🌿', n:'Jungle',           d:'Assassins : +10% ATK. Traversable normalement.' },
+    river:   { e:'🌊', n:'Rivière',          d:'Coûte 2 pts de déplacement. Éléments Feu : -20% RM.' },
+    bridge:  { e:'🌉', n:'Pont',             d:'Traverse la rivière sans malus.' },
+    base:    { e:'🏰', n:'Base',             d:'Zone de départ des champions.' },
+    fountain:{ e:'⛲', n:'Fontaine',         d:'Détruisez les 3 fontaines adverses pour gagner !' },
+  };
+  const t = info[terrain] || { e:'?', n:terrain, d:'' };
+  showToast(`${t.e} ${t.n} — ${t.d}`, '');
+}
+
+// ── Spell animations ───────────────────────────────────────────
+function flashCells(cells, cssClass, durationMs = 500) {
+  cells.forEach(([r,c]) => {
+    const cell = getCellEl('board-game', r, c);
+    if (!cell) return;
+    cell.classList.add(cssClass);
+    setTimeout(() => cell.classList.remove(cssClass), durationMs);
+  });
+}
+
+function triggerSpellAnim(champId, spellKey, piece, targetRow, targetCol) {
+  const targeting = getSpellTargeting(champId, spellKey);
+  const range = getSpellRange(champId, spellKey);
+  const cells = [];
+
+  if (targeting === 'line') {
+    const dr = Math.sign(targetRow - piece.row);
+    const dc = Math.sign(targetCol - piece.col);
+    for (let i = 1; i <= range; i++) {
+      const nr = piece.row + dr*i, nc = piece.col + dc*i;
+      if (nr < 0 || nr >= 13 || nc < 0 || nc >= 13) break;
+      cells.push([nr, nc]);
+      const hasPiece = S.gameState?.pieces.find(p => p.row===nr && p.col===nc && p.alive);
+      if (hasPiece) break;
+    }
+    const animClass = (champId === 'pyrox' || champId === 'karek') ? 'anim-fire-line' : (champId === 'zhen' || champId === 'rohn') ? 'anim-elec-line' : 'anim-spell-line';
+    cells.forEach(([r,c], i) => {
+      setTimeout(() => {
+        const cell = getCellEl('board-game', r, c);
+        if (cell) { cell.classList.add(animClass); setTimeout(() => cell.classList.remove(animClass), 350); }
+      }, i * 60);
+    });
+    return;
+  }
+  if (targeting === 'full_row') {
+    for (let c = 0; c < 13; c++) cells.push([piece.row, c]);
+    flashCells(cells, 'anim-wave', 600);
+    return;
+  }
+  if (targeting === 'aoe_self' || targeting === 'self') {
+    for (let dr = -range; dr <= range; dr++) {
+      for (let dc = -range; dc <= range; dc++) {
+        const nr = piece.row+dr, nc = piece.col+dc;
+        if (nr>=0 && nr<13 && nc>=0 && nc<13) cells.push([nr,nc]);
+      }
+    }
+    flashCells(cells, 'anim-aoe', 500);
+    return;
+  }
+  if (targeting === 'all_diag') {
+    [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
+      for (let i = 1; i <= range; i++) {
+        const nr = piece.row+dr*i, nc = piece.col+dc*i;
+        if (nr>=0 && nr<13 && nc>=0 && nc<13) cells.push([nr,nc]);
+      }
+    });
+    flashCells(cells, 'anim-diag', 450);
+    return;
+  }
+  // Default: single target flash
+  if (typeof targetRow === 'number') flashCells([[targetRow, targetCol]], 'anim-spell-hit', 400);
+}
+
+// ── Champion modal ─────────────────────────────────────────────
+function openChampModal(piece) {
+  const champDef = CHAMPIONS[piece.championId] || {};
+  const pct = piece.maxHp > 0 ? (piece.hp / piece.maxHp * 100) : 0;
+  const barColor = pct > 60 ? 'var(--green)' : pct > 25 ? '#ffa502' : 'var(--red2)';
+
+  // Header
+  const imgSrc = champImgSrc(piece.championId);
+  el('cm-img').innerHTML = imgSrc
+    ? `<img src="${imgSrc}" class="cm-portrait" alt="">`
+    : `<span style="font-size:3rem">${champDef.emoji||'?'}</span>`;
+  el('cm-name').textContent = champDef.name || piece.championId;
+  el('cm-title-text').textContent = champDef.title || '';
+  el('cm-class').textContent = `${champDef.class||''} · ${champDef.element||''}`;
+  el('cm-hp-fill').style.cssText = `width:${pct}%;background:${barColor}`;
+  el('cm-hp-text').textContent = `${piece.hp} / ${piece.maxHp} PV`;
+
+  // Stats tab
+  const statuses = (piece.statuses||[]);
+  const statusHtml = statuses.length
+    ? statuses.map(s => `<div class="cm-status-row"><span class="cm-status-icon">${STATUS_ICONS[s.name]||'?'}</span><span class="cm-status-name">${s.name}</span><span class="cm-status-dur">(${s.duration} tour${s.duration>1?'s':''})</span></div>`).join('')
+    : '<div style="color:var(--text2);font-size:0.75rem">Aucun statut actif</div>';
+
+  el('cm-body-stats').innerHTML = `
+    <div class="cm-stats-grid">
+      <div class="cm-stat-item"><span class="cm-stat-icon">❤️</span><span class="cm-stat-label">PV</span><span class="cm-stat-val">${piece.hp}/${piece.maxHp}</span></div>
+      <div class="cm-stat-item"><span class="cm-stat-icon">⚔️</span><span class="cm-stat-label">ATK</span><span class="cm-stat-val">${piece.atk}</span></div>
+      <div class="cm-stat-item"><span class="cm-stat-icon">🛡️</span><span class="cm-stat-label">ARM</span><span class="cm-stat-val">${piece.arm}</span></div>
+      <div class="cm-stat-item"><span class="cm-stat-icon">✨</span><span class="cm-stat-label">RM</span><span class="cm-stat-val">${piece.rm}</span></div>
+      <div class="cm-stat-item"><span class="cm-stat-icon">⚡</span><span class="cm-stat-label">SPD</span><span class="cm-stat-val">${piece.spd}</span></div>
+      <div class="cm-stat-item"><span class="cm-stat-icon">🚶</span><span class="cm-stat-label">MOVE</span><span class="cm-stat-val">${piece.move}${piece.bonusMove?'+'+piece.bonusMove:''}</span></div>
+      <div class="cm-stat-item"><span class="cm-stat-icon">🎯</span><span class="cm-stat-label">RANGE ATK</span><span class="cm-stat-val">${piece.atkRange}</span></div>
+    </div>
+    <div class="cm-statuses-section">
+      <div class="cm-section-title">Statuts actifs</div>
+      ${statusHtml}
+    </div>`;
+
+  // Spells tab
+  const cds = piece.spellCooldowns || {};
+  const spellDefs = [
+    { key:'s1',    label:'Sort 1',    def:champDef.s1 },
+    { key:'s2',    label:'Sort 2',    def:champDef.s2 },
+    { key:'ultim', label:'Ultime ✨', def:champDef.u },
+  ];
+  el('cm-body-spells').innerHTML = spellDefs.filter(sp => sp.def?.name).map(sp => {
+    const cd = cds[sp.key] || 0;
+    const onCd = cd > 0;
+    const acted = piece.actedThisTurn?.spelled;
+    return `<div class="cm-spell-row ${onCd||acted?'cm-spell-cd':''}">
+      <div class="cm-spell-header">
+        <span class="cm-spell-label">${sp.label}</span>
+        <span class="cm-spell-name">${sp.def.name}</span>
+        ${onCd ? `<span class="cm-spell-cd-badge">${cd} tour${cd>1?'s':''}</span>` : ''}
+      </div>
+      <div class="cm-spell-desc">${sp.def.desc||''}</div>
+    </div>`;
+  }).join('');
+
+  switchCmTab('stats');
+  el('champ-modal-overlay').style.display = 'flex';
+}
+
+function closeChampModal() {
+  el('champ-modal-overlay').style.display = 'none';
+}
+
+function switchCmTab(tab) {
+  el('cm-tab-stats').classList.toggle('active', tab==='stats');
+  el('cm-tab-spells').classList.toggle('active', tab==='spells');
+  el('cm-body-stats').style.display = tab==='stats' ? '' : 'none';
+  el('cm-body-spells').style.display = tab==='spells' ? '' : 'none';
+}
+
+// ── Hub copy code + random name ────────────────────────────────
+el('waiting-code').onclick = () => {
+  navigator.clipboard.writeText(S.roomCode || '').then(() => showToast('Code copié !', 'success'));
+};
+
+const RANDOM_PREFIXES = ['Ombre','Brise','Éclair','Forge','Lame','Voile','Rune','Brume','Tempête','Abyssal','Foudre','Pierre'];
+const RANDOM_SUFFIXES = ['Noire','Ardente','Céleste','Mortelle','Glacée','Vivante','Secrète','Divine','Ancienne','Éternelle'];
+function randomName() {
+  const p = RANDOM_PREFIXES[Math.floor(Math.random()*RANDOM_PREFIXES.length)];
+  const s = RANDOM_SUFFIXES[Math.floor(Math.random()*RANDOM_SUFFIXES.length)];
+  return p + s;
+}
+function applyRandomName(inputId) {
+  const name = randomName();
+  el(inputId).value = name;
+  // Also pick random avatar
+  const idx = Math.floor(Math.random() * AVATARS.length);
+  selectedAvatar = AVATARS[idx];
+  document.querySelectorAll('.avatar-opt').forEach((a,i) => a.classList.toggle('selected', i===idx));
+}
+el('btn-random-join').onclick   = () => applyRandomName('inp-name-join');
+el('btn-random-create').onclick = () => applyRandomName('inp-name-create');
+
 // ── Socket events ──────────────────────────────────────────────
 socket.on('rb:created', ({ roomCode, state }) => {
   S.myId = socket.id;
   S.roomCode = roomCode;
   S.myTeam = state.players.find(p => p.id === S.myId)?.team || 'blue';
+  sessionStorage.setItem('rb_room', S.roomCode);
+  sessionStorage.setItem('rb_myId', S.myId);
   showScreen('screen-waiting');
   renderWaiting(state);
 });
@@ -1128,6 +1361,8 @@ socket.on('rb:joined', ({ roomCode, state }) => {
   S.myId = socket.id;
   S.roomCode = roomCode;
   S.myTeam = state.players.find(p => p.id === S.myId)?.team || 'red';
+  sessionStorage.setItem('rb_room', S.roomCode);
+  sessionStorage.setItem('rb_myId', S.myId);
   showScreen('screen-waiting');
   renderWaiting(state);
 });
@@ -1149,6 +1384,10 @@ socket.on('rb:state', (state) => {
   }
 
   S.gameState = state;
+  if (state.phase !== 'lobby' && S.roomCode) {
+    sessionStorage.setItem('rb_room', S.roomCode);
+    sessionStorage.setItem('rb_myId', S.myId);
+  }
   S.myTeam = state.players.find(p => p.id === S.myId)?.team || S.myTeam;
 
   // Turn change banner

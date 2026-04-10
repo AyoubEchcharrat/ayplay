@@ -14,32 +14,21 @@ const COLS = 13;
  */
 function buildBaseTerrain() {
   const grid = [];
-
   for (let r = 0; r < ROWS; r++) {
     grid[r] = [];
     for (let c = 0; c < COLS; c++) {
       let terrain;
-
       if (r === 0 || r === 12) {
         terrain = 'base';
       } else if (r === 6) {
-        // River row (middle), bridge at cols 5-7
-        terrain = (c >= 5 && c <= 7) ? 'bridge' : 'river';
+        terrain = (c === 6) ? 'bridge' : 'river';
       } else {
-        // rows 1–5 (red side) and 7–11 (blue side)
-        if (c >= 3 && c <= 4) {
-          terrain = 'jungle';
-        } else if (c >= 8 && c <= 9) {
-          terrain = 'jungle';
-        } else {
-          terrain = 'lane';
-        }
+        const inJungle = (c >= 1 && c <= 3) || (c >= 9 && c <= 11);
+        terrain = inJungle ? 'jungle' : 'lane';
       }
-
       grid[r][c] = terrain;
     }
   }
-
   return grid;
 }
 
@@ -134,7 +123,7 @@ const CHAMPIONS = {
     spells: {
       s1: {
         name: 'Charge Tellurique',
-        desc: 'Fonce en ligne droite sur 4 cases et repousse les ennemis sur le côté.',
+        desc: 'Fonce en ligne droite sur 4 cases, repousse les ennemis sur le côté et les embrase par friction.',
         targeting: 'line',
         range: 4,
         cd: 2,
@@ -142,6 +131,7 @@ const CHAMPIONS = {
           { type: 'caster_move_to_line_end' },
           { type: 'damage', base: 250, scaling: 'atk' },
           { type: 'push', dir: 'side', dist: 1 },
+          { type: 'status', name: 'embrasé', duration: 2, value: 40 },
         ],
       },
       s2: {
@@ -397,12 +387,12 @@ const CHAMPIONS = {
     spells: {
       s1: {
         name: 'Mur de Pierre',
-        desc: 'Érige un mur de 3 cases de large pendant 2 tours.',
+        desc: 'Érige un mur de 3 cases de large pendant 5 tours.',
         targeting: 'adjacent',
         range: 2,
         cd: 0,
         effects: [
-          { type: 'create_wall', width: 3, duration: 2 },
+          { type: 'create_wall', width: 3, duration: 5 },
         ],
       },
       s2: {
@@ -550,13 +540,14 @@ const CHAMPIONS = {
     spells: {
       s1: {
         name: 'Morsure Vorace',
-        desc: 'Morsure adjacente avec vol de vie ; bonus de vol si la cible saigne.',
+        desc: 'Morsure adjacente : dégâts + saignement 3 tours + vol de vie (30%, 60% si cible saigne déjà).',
         targeting: 'adjacent',
         range: 1,
         cd: 0,
         effects: [
           { type: 'damage', base: 250, scaling: 'atk' },
           { type: 'lifesteal', ratio: 0.3, bonusRatio: 0.6, bonusCond: 'saignement' },
+          { type: 'status', name: 'saignement', duration: 3, value: 30 },
         ],
       },
       s2: {

@@ -575,3 +575,72 @@ input::placeholder { color:var(--text2); }
   .draft-sidebar { width:160px; }
   .act-btn { font-size:0.65rem; padding:5px 4px; }
 }
+
+/* ── Champion Modal ──────────────────────────────────────────── */
+.champ-modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:1000;
+  display:flex; align-items:center; justify-content:center;
+  backdrop-filter:blur(4px); animation:fadeIn 0.15s ease;
+}
+.champ-modal {
+  background:var(--bg2); border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px; padding:0; max-width:440px; width:92vw;
+  max-height:88vh; overflow-y:auto; position:relative;
+  box-shadow:0 24px 80px rgba(0,0,0,0.6);
+  animation:slideUp 0.2s ease;
+}
+@keyframes slideUp { from{transform:translateY(24px);opacity:0} to{transform:translateY(0);opacity:1} }
+.champ-modal-close { position:absolute; top:12px; right:12px; background:rgba(255,255,255,0.08);
+  border:none; color:var(--text2); cursor:pointer; border-radius:50%;
+  width:28px; height:28px; font-size:0.8rem; display:flex; align-items:center; justify-content:center; }
+.champ-modal-close:hover { background:rgba(255,80,80,0.3); color:#fff; }
+.cm-header { display:flex; gap:14px; padding:20px; background:linear-gradient(135deg,rgba(26,120,194,0.15),transparent); border-bottom:1px solid rgba(255,255,255,0.06); }
+.cm-img-wrap { width:90px; height:90px; border-radius:12px; overflow:hidden; flex-shrink:0; background:var(--bg3); display:flex; align-items:center; justify-content:center; }
+.cm-portrait { width:100%; height:100%; object-fit:cover; }
+.cm-title-block { flex:1; display:flex; flex-direction:column; justify-content:center; gap:3px; }
+.cm-name  { font-size:1.15rem; font-weight:900; color:var(--text); }
+.cm-title { font-size:0.72rem; color:var(--gold); font-style:italic; }
+.cm-class { font-size:0.68rem; color:var(--text2); }
+.cm-hp-bar-wrap { margin-top:6px; display:flex; align-items:center; gap:6px; }
+.cm-hp-bar  { flex:1; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; }
+.cm-hp-fill { height:100%; border-radius:3px; transition:width 0.3s; }
+.cm-hp-text { font-size:0.68rem; color:var(--text2); white-space:nowrap; }
+.cm-tabs { display:flex; border-bottom:1px solid rgba(255,255,255,0.07); }
+.cm-tab { flex:1; padding:10px; background:none; border:none; color:var(--text2);
+  cursor:pointer; font-size:0.78rem; font-weight:600; transition:all 0.15s; }
+.cm-tab:hover { color:var(--text); background:rgba(255,255,255,0.04); }
+.cm-tab.active { color:var(--gold); border-bottom:2px solid var(--gold); }
+.cm-body { padding:16px; }
+.cm-stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+.cm-stat-item { display:flex; align-items:center; gap:8px; background:var(--bg3); border-radius:8px; padding:8px 10px; }
+.cm-stat-icon { font-size:1rem; }
+.cm-stat-label { font-size:0.65rem; color:var(--text2); flex:1; }
+.cm-stat-val { font-size:0.85rem; font-weight:700; color:var(--text); }
+.cm-statuses-section { border-top:1px solid rgba(255,255,255,0.06); padding-top:12px; }
+.cm-section-title { font-size:0.62rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--text2); margin-bottom:8px; }
+.cm-status-row { display:flex; align-items:center; gap:6px; padding:4px 0; font-size:0.75rem; }
+.cm-status-icon { font-size:0.9rem; }
+.cm-status-name { color:var(--text); font-weight:600; }
+.cm-status-dur  { color:var(--text2); }
+.cm-spell-row { background:var(--bg3); border-radius:8px; padding:12px; margin-bottom:8px; border:1px solid rgba(255,255,255,0.05); }
+.cm-spell-row.cm-spell-cd { opacity:0.6; }
+.cm-spell-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.cm-spell-label { font-size:0.62rem; font-weight:700; text-transform:uppercase; color:var(--text2); background:var(--bg4); border-radius:4px; padding:2px 6px; }
+.cm-spell-name  { font-size:0.82rem; font-weight:700; color:var(--gold); flex:1; }
+.cm-spell-cd-badge { font-size:0.65rem; color:var(--red2); background:rgba(244,67,54,0.15); border-radius:4px; padding:2px 6px; }
+.cm-spell-desc { font-size:0.73rem; color:var(--text2); line-height:1.5; }
+
+/* ── Spell animations ───────────────────────────────────────── */
+@keyframes fireFlash  { 0%{background:rgba(255,100,0,0.0)}  30%{background:rgba(255,120,0,0.55)} 100%{background:rgba(255,100,0,0.0)} }
+@keyframes elecFlash  { 0%{background:rgba(180,0,255,0.0)}  30%{background:rgba(200,50,255,0.55)} 100%{background:rgba(180,0,255,0.0)} }
+@keyframes waveFlash  { 0%{background:rgba(0,120,255,0.0)}  40%{background:rgba(0,150,255,0.5)}  100%{background:rgba(0,120,255,0.0)} }
+@keyframes aoeFlash   { 0%{background:rgba(200,50,200,0.0)} 30%{background:rgba(200,50,200,0.45)} 100%{background:rgba(200,50,200,0.0)} }
+@keyframes diagFlash  { 0%{background:rgba(200,200,0,0.0)}  30%{background:rgba(220,220,0,0.4)}  100%{background:rgba(200,200,0,0.0)} }
+@keyframes spellHit   { 0%{background:rgba(255,255,100,0.0)} 30%{background:rgba(255,255,100,0.5)} 100%{background:rgba(255,255,100,0.0)} }
+.anim-fire-line  { animation:fireFlash  0.35s ease forwards; }
+.anim-elec-line  { animation:elecFlash  0.35s ease forwards; }
+.anim-wave       { animation:waveFlash  0.6s ease forwards; }
+.anim-aoe        { animation:aoeFlash   0.5s ease forwards; }
+.anim-diag       { animation:diagFlash  0.45s ease forwards; }
+.anim-spell-hit  { animation:spellHit   0.4s ease forwards; }
+.anim-spell-line { animation:spellHit   0.35s ease forwards; }

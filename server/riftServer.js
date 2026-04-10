@@ -46,7 +46,7 @@ function initRiftGame(io) {
       if (r.phase !== 'placement') return socket.emit('rb:error', { message: 'Pas en phase de placement' });
       const placeResult = r.placeChampion(socket.id, championId, row, col);
       if (placeResult?.error) return socket.emit('rb:error', { message: placeResult.error });
-      r.broadcast('rb:state', r.publicState());
+      // Note: placeChampion calls broadcastPlacement() or startGame() internally
     });
 
     // ── Actions ────────────────────────────────────────────────
@@ -92,22 +92,43 @@ function initRiftGame(io) {
       r.broadcast('rb:state', r.publicState());
     });
 
+    // ── Reconnect ──────────────────────────────────────────────
+    socket.on('rb:rejoin', ({ roomCode, previousId }) => {
+      const r = getRoom((roomCode || '').toUpperCase());
+      if (!r) return socket.emit('rb:error', { message: 'Room introuvable' });
+      // Cancel pending disconnect timer
+      if (r._reconnectTimers?.has(previousId)) {
+        clearTimeout(r._reconnectTimers.get(previousId));
+        r._reconnectTimers.delete(previousId);
+      }
+      const result = r.rejoinPlayer(previousId, socket);
+      if (result.error) return socket.emit('rb:error', { message: result.error });
+      socket.data.rbRoom = r.code;
+      r.broadcast('rb:reconnected', { message: `${result.player.name} s'est reconnecté.` });
+      if (r.phase === 'placement') { r.broadcastPlacement(); }
+      else { socket.emit('rb:state', r.publicState()); }
+    });
+
     // ── Disconnect ─────────────────────────────────────────────
     socket.on('disconnect', () => {
       const r = room();
       if (!r) return;
-      r.players.delete(socket.id);
-      if (r.players.size === 0) {
-        deleteRoom(r.code);
-        return;
-      }
-      // Notify remaining player
-      r.broadcast('rb:player_left', { message: 'L\'adversaire a quitté la partie.' });
-      if (r.phase === 'playing') {
-        const remaining = [...r.players.values()];
-        r.endGame(remaining[0].team);
-        r.broadcast('rb:state', r.publicState());
-      }
+      const p = player();
+      if (!p) return;
+      r._reconnectTimers = r._reconnectTimers || new Map();
+      const timer = setTimeout(() => {
+        if (!r.players.has(socket.id)) return; // already rejoined under new id
+        r.players.delete(socket.id);
+        if (r.players.size === 0) { deleteRoom(r.code); return; }
+        r.broadcast('rb:player_left', { message: `${p.name} a quitté la partie.` });
+        if (r.phase === 'playing') {
+          const remaining = [...r.players.values()];
+          r.endGame(remaining[0].team);
+          r.broadcast('rb:state', r.publicState());
+        }
+      }, 30000);
+      r._reconnectTimers.set(socket.id, timer);
+      r.broadcast('rb:player_disconnected', { message: `${p.name} a perdu la connexion… (30s pour se reconnecter)` });
     });
   });
 }
