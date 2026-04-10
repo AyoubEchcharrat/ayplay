@@ -1542,7 +1542,7 @@ class RiftRoom {
         const casterTerrain = this.terrain[caster.row]?.[caster.col];
         const waveRange = (casterTerrain === 'river' || casterTerrain === 'bridge')
           ? (effect.extendedRange || 8)
-          : (spell.range || 4);
+          : (effect.range || 4);
         // Collect cells along the wave
         const waveCells = [];
         for (let i = 1; i <= waveRange; i++) {
@@ -1551,52 +1551,60 @@ class RiftRoom {
           if (!inBounds(wr, wc)) break;
           waveCells.push({ row: wr, col: wc });
         }
+        // Track already-hit pieces to avoid double-hitting after push
+        const hitPieceIds = new Set();
         // Apply to each cell
         for (const cell of waveCells) {
           const target = this._getPieceAt(cell.row, cell.col);
+          // Water trail on empty cells
           if (!target) {
-            // No piece, just handle water trail
             if (effect.leavesWaterTrail) {
               const orig = this.terrain[cell.row]?.[cell.col];
-              if (orig === 'lane' || orig === 'jungle') {
+              if (orig && orig !== 'river' && orig !== 'bridge') {
                 this.waterTrails = this.waterTrails || [];
+                // Avoid duplicate trails on same cell
+                if (!this.waterTrails.some(t => t.r === cell.row && t.c === cell.col)) {
+                  this.waterTrails.push({ r: cell.row, c: cell.col, origTerrain: orig, duration: 1 });
+                  this.terrain[cell.row][cell.col] = 'river';
+                  this.log.push(`🌊 Trainée d'eau sur (${cell.row},${cell.col}).`);
+                }
+              }
+            }
+            continue;
+          }
+          // Skip already-hit pieces (e.g. pushed into the wave path)
+          if (hitPieceIds.has(target.id)) continue;
+          hitPieceIds.add(target.id);
+          // Extinguish embrasé
+          if (this.hasStatus(target, 'embrasé')) {
+            this.removeStatus(target, 'embrasé');
+            this.log.push(`🌊 Vague éteint l'embrasement de ${this._pieceName(target)}!`);
+          }
+          // Water trail on the cell the piece was on (before push)
+          if (effect.leavesWaterTrail) {
+            const orig = this.terrain[cell.row]?.[cell.col];
+            if (orig && orig !== 'river' && orig !== 'bridge') {
+              this.waterTrails = this.waterTrails || [];
+              if (!this.waterTrails.some(t => t.r === cell.row && t.c === cell.col)) {
                 this.waterTrails.push({ r: cell.row, c: cell.col, origTerrain: orig, duration: 1 });
                 this.terrain[cell.row][cell.col] = 'river';
                 this.log.push(`🌊 Trainée d'eau sur (${cell.row},${cell.col}).`);
               }
             }
-            continue;
           }
-          // Extinguish embrasé on everyone
-          if (this.hasStatus(target, 'embrasé')) {
-            this.removeStatus(target, 'embrasé');
-            this.log.push(`🌊 Vague éteint l'embrasement de ${this._pieceName(target)}!`);
-          }
-          // Push back 1 cell
-          const pushDr = dr;
-          const pushDc = dc;
-          const pr = target.row + pushDr;
-          const pc = target.col + pushDc;
+          // Push back 1 cell in wave direction
+          const pr = target.row + dr;
+          const pc = target.col + dc;
           const canPush = inBounds(pr, pc) && !this._getPieceAt(pr, pc) && !this._getFountainAt(pr, pc)
             && !this.walls.some(w => w.r === pr && w.c === pc);
           if (canPush) { target.row = pr; target.col = pc; }
-          // Damage enemies only
+          // Damage enemies only (once)
           if (target.team !== caster.team) {
             const dmg = calcMagicDmg(200 + Math.floor(caster.rm * 0.8), target.rm, 0);
             const actual = this._applyDamage(target, dmg);
             this.log.push(`🌊 ${this._pieceName(caster)} frappe ${this._pieceName(target)} pour ${actual} dégâts.`);
           } else {
             this.log.push(`🌊 Vague repousse allié ${this._pieceName(target)}.`);
-          }
-          // Water trail on the cell the piece was on (before push)
-          if (effect.leavesWaterTrail) {
-            const orig = this.terrain[cell.row]?.[cell.col];
-            if (orig === 'lane' || orig === 'jungle') {
-              this.waterTrails = this.waterTrails || [];
-              this.waterTrails.push({ r: cell.row, c: cell.col, origTerrain: orig, duration: 1 });
-              this.terrain[cell.row][cell.col] = 'river';
-              this.log.push(`🌊 Trainée d'eau sur (${cell.row},${cell.col}).`);
-            }
           }
         }
         break;

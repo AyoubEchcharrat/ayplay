@@ -24,7 +24,7 @@ function initRiftGame(io) {
       r.addPlayer(socket.id, socket, name, avatar);
       socket.data.rbRoom = r.code;
       socket.emit('rb:joined', { roomCode: r.code, state: r.publicState() });
-      r.broadcast('rb:state', r.publicState());
+      r.broadcastState();
     });
 
     // ── Draft ──────────────────────────────────────────────────
@@ -36,7 +36,7 @@ function initRiftGame(io) {
         return socket.emit('rb:error', { message: 'Choisir exactement 5 champions' });
       const draftResult = r.chooseDraft(socket.id, championIds);
       if (draftResult?.error) return socket.emit('rb:error', { message: draftResult.error });
-      r.broadcast('rb:state', r.publicState());
+      r.broadcastState();
     });
 
     // ── Placement ─────────────────────────────────────────────
@@ -55,7 +55,7 @@ function initRiftGame(io) {
       if (!r) return;
       const moveResult = r.actionMove(socket.id, pieceId, row, col);
       if (moveResult?.error) return socket.emit('rb:error', { message: moveResult.error });
-      r.broadcast('rb:state', r.publicState());
+      r.broadcastState();
     });
 
     socket.on('rb:attack', ({ pieceId, targetRow, targetCol }) => {
@@ -63,7 +63,7 @@ function initRiftGame(io) {
       if (!r) return;
       const attackResult = r.actionAttack(socket.id, pieceId, targetRow, targetCol);
       if (attackResult?.error) return socket.emit('rb:error', { message: attackResult.error });
-      r.broadcast('rb:state', r.publicState());
+      r.broadcastState();
     });
 
     socket.on('rb:spell', ({ pieceId, spellKey, targetRow, targetCol, extra }) => {
@@ -71,7 +71,7 @@ function initRiftGame(io) {
       if (!r) return;
       const spellResult = r.actionSpell(socket.id, pieceId, spellKey, targetRow, targetCol, extra);
       if (spellResult?.error) return socket.emit('rb:error', { message: spellResult.error });
-      r.broadcast('rb:state', r.publicState());
+      r.broadcastState();
     });
 
     socket.on('rb:end_turn', ({ pieceId }) => {
@@ -79,7 +79,7 @@ function initRiftGame(io) {
       if (!r) return;
       const endResult = r.actionEndTurn(socket.id, pieceId);
       if (endResult?.error) return socket.emit('rb:error', { message: endResult.error });
-      r.broadcast('rb:state', r.publicState());
+      r.broadcastState();
     });
 
     // ── Start draft (host triggers when both players in lobby) ─
@@ -89,7 +89,7 @@ function initRiftGame(io) {
       if (r.players.size < 2) return socket.emit('rb:error', { message: 'En attente d\'un 2ème joueur' });
       if (r.phase !== 'lobby') return;
       r.phase = 'draft';
-      r.broadcast('rb:state', r.publicState());
+      r.broadcastState();
     });
 
     // ── Reconnect ──────────────────────────────────────────────
@@ -106,7 +106,7 @@ function initRiftGame(io) {
       socket.data.rbRoom = r.code;
       r.broadcast('rb:reconnected', { message: `${result.player.name} s'est reconnecté.` });
       if (r.phase === 'placement') { r.broadcastPlacement(); }
-      else { socket.emit('rb:state', r.publicState()); }
+      else { r.broadcastState(); }
     });
 
     // ── Disconnect ─────────────────────────────────────────────
@@ -124,7 +124,7 @@ function initRiftGame(io) {
         if (r.phase === 'playing') {
           const remaining = [...r.players.values()];
           r.endGame(remaining[0].team);
-          r.broadcast('rb:state', r.publicState());
+          r.broadcastState();
         }
       }, 120000);
       r._reconnectTimers.set(socket.id, timer);
