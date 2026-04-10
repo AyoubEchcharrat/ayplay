@@ -117,7 +117,7 @@ const CHAMPIONS = {
 
   karek: {
     id: 'karek',
-    name: 'Karek',
+    name: 'Gavik',
     title: 'Le Brise-Ligne',
     class: 'tank-guerrier',
     element: 'terre',

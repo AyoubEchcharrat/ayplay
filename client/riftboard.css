@@ -149,7 +149,8 @@ input::placeholder { color:var(--text2); }
 .champ-card:hover { border-color:var(--gold); background:rgba(200,155,60,0.08); transform:translateY(-2px); }
 .champ-card.selected { border-color:var(--gold); background:rgba(200,155,60,0.15); }
 .champ-card.selected::after { content:'✓'; position:absolute; top:4px; right:6px; color:var(--gold); font-weight:900; font-size:0.8rem; }
-.champ-card-emoji { font-size:2rem; margin-bottom:5px; }
+.champ-card-emoji { font-size:2rem; margin-bottom:5px; display:flex; align-items:center; justify-content:center; height:72px; overflow:hidden; border-radius:8px; }
+.champ-card-emoji img { width:72px; height:72px; object-fit:cover; border-radius:8px; display:block; }
 .champ-card-name { font-size:0.78rem; font-weight:700; color:var(--text); }
 .champ-card-class { font-size:0.62rem; color:var(--text2); margin-top:2px; }
 .champ-card-element { font-size:0.6rem; margin-top:2px; border-radius:10px; padding:1px 6px; display:inline-block; }
@@ -204,7 +205,8 @@ input::placeholder { color:var(--text2); }
 /* Turn order: compact horizontal chips in topbar */
 .turn-order-bar { display:flex; gap:3px; align-items:center; overflow-x:auto; flex:1; padding:0 4px; scrollbar-width:none; }
 .turn-order-bar::-webkit-scrollbar { display:none; }
-.turn-chip { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.8rem; border:2px solid transparent; flex-shrink:0; transition:all 0.15s; cursor:default; }
+.turn-chip { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.8rem; border:2px solid transparent; flex-shrink:0; transition:all 0.15s; cursor:default; overflow:hidden; }
+.turn-chip img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
 .turn-chip.active-turn { border-color:var(--gold); box-shadow:0 0 8px rgba(200,155,60,0.5); transform:scale(1.2); }
 .turn-chip.blue-piece { background:rgba(26,120,194,0.3); border-color:rgba(26,120,194,0.5); }
 .turn-chip.red-piece  { background:rgba(194,48,48,0.3);  border-color:rgba(194,48,48,0.5);  }
@@ -326,6 +328,15 @@ input::placeholder { color:var(--text2); }
   font-size:calc(var(--cell-size) * 0.36);
   line-height:1;
   filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+  display:flex; align-items:center; justify-content:center;
+}
+.piece-img {
+  width:calc(var(--cell-size) * 0.64);
+  height:calc(var(--cell-size) * 0.64);
+  object-fit:cover;
+  border-radius:4px;
+  display:block;
+  filter:drop-shadow(0 1px 3px rgba(0,0,0,0.7));
 }
 .piece-name-mini {
   font-size:calc(var(--cell-size) * 0.115);
@@ -405,7 +416,8 @@ input::placeholder { color:var(--text2); }
 /* Active piece panel */
 .active-piece-card { background:var(--bg3); border-radius:8px; padding:10px; margin-bottom:8px; }
 .apc-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-.apc-emoji  { font-size:1.7rem; }
+.apc-emoji  { font-size:1.7rem; display:flex; align-items:center; justify-content:center; }
+.apc-emoji img, .apc-img { width:36px; height:36px; object-fit:cover; border-radius:6px; }
 .apc-name   { font-weight:700; font-size:0.92rem; }
 .apc-class  { font-size:0.66rem; color:var(--gold); }
 .apc-hp-bar { height:5px; background:rgba(255,255,255,0.1); border-radius:3px; margin-bottom:6px; overflow:hidden; }
@@ -464,7 +476,8 @@ input::placeholder { color:var(--text2); }
 /* Hovered piece info */
 .hover-piece-card { background:var(--bg3); border-radius:8px; padding:9px; }
 .hpc-header { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
-.hpc-emoji  { font-size:1.2rem; }
+.hpc-emoji  { font-size:1.2rem; display:flex; align-items:center; justify-content:center; }
+.hpc-emoji img, .hpc-img { width:28px; height:28px; object-fit:cover; border-radius:5px; }
 .hpc-name   { font-weight:700; font-size:0.83rem; }
 .hpc-hp     { font-size:0.68rem; color:var(--text2); }
 .hpc-stats  { display:flex; flex-wrap:wrap; gap:3px; font-size:0.63rem; }
@@ -500,6 +513,7 @@ input::placeholder { color:var(--text2); }
 #turn-banner.show { display:flex; animation:banner-sweep 2s ease forwards; }
 #turn-banner.enemy-turn { border-color:var(--red2); box-shadow:0 0 40px rgba(244,67,54,0.25), var(--shadow); }
 .tb-emoji { font-size:2rem; }
+.tb-img   { width:48px; height:48px; object-fit:cover; border-radius:8px; flex-shrink:0; }
 .tb-name  { font-size:1.1rem; font-weight:900; color:var(--text); }
 .tb-label { font-size:0.75rem; color:var(--gold); font-weight:700; text-transform:uppercase; letter-spacing:1px; }
 #turn-banner.enemy-turn .tb-label { color:var(--red2); }

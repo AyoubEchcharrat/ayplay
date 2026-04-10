@@ -20,8 +20,8 @@ const S = {
 
 // Champion definitions (mirrored from server for display)
 const CHAMPIONS = {
-  karek:  { name:'Karek',  title:'Le Brise-Ligne',         class:'Tank-Guerrier', element:'terre',   emoji:'🪨', spd:2,
-    s1:{name:'Charge Tellurique',   desc:'Fonce en ligne droite sur 4 cases, repousse les ennemis sur le côté. Karek avance jusqu\'à la dernière case libre.'},
+  karek:  { name:'Gavik',  title:'Le Brise-Ligne',         class:'Tank-Guerrier', element:'terre',   emoji:'🪨', spd:2,
+    s1:{name:'Charge Tellurique',   desc:'Fonce en ligne droite sur 4 cases, repousse les ennemis sur le côté. Gavik avance jusqu\'à la dernière case libre.'},
     s2:{name:'Frappe Sismique',     desc:'Frappe en arc avant, ralentit les ennemis 1 tour.'},
     u:{name:'Pilier de Terre',      desc:'Immobile 2 tours, renvoie 40% des dégâts.'},
     stats:{hp:2800,atk:220,arm:60,rm:30,spd:2,move:2,atkRange:1} },
@@ -77,6 +77,32 @@ const CHAMPIONS = {
 };
 
 const CHAMPION_LIST = ['karek','lysha','syal','velara','pyrox','gorath','aelys','rohn','vek','zhen'];
+
+// ── Champion images ────────────────────────────────────────────
+const CHAMPION_IMGS = {
+  karek:  "ChatGPT Image Apr 10, 2026, 07_05_01 PM.png",
+  lysha:  "Lysha, the Ghostly Assassin.png",
+  syal:   "Le Tisserand d'Ombre in shadowcraft.png",
+  velara: "Velara, mage of the tides.png",
+  pyrox:  "Le Brasier Vivant_ Pyrox's fiery power.png",
+  gorath: "La Forteresse_ guardian of stone and crystals.png",
+  aelys:  "La Gardienne, the light's protector.png",
+  rohn:   "Le Traqueur and his companions.png",
+  vek:    "La Bête des Profondeurs emerges.png",
+  zhen:   "The monk of lightning's fury.png",
+};
+
+function champImgSrc(championId) {
+  const file = CHAMPION_IMGS[championId];
+  if (!file) return null;
+  return '/assets/pion_imgs/' + encodeURIComponent(file);
+}
+
+function champVisual(championId, fallbackEmoji, cssClass) {
+  const src = champImgSrc(championId);
+  if (src) return `<img src="${src}" class="${cssClass || 'piece-img'}" alt="">`;
+  return fallbackEmoji || '❓';
+}
 
 const STATUS_ICONS = {
   'embrasé':'🔥','saignement':'🩸','poison':'🟢','ralenti':'🐢','gelé':'❄️',
@@ -206,7 +232,7 @@ function renderDraft() {
     card.className = 'champ-card';
     card.dataset.id = id;
     card.innerHTML = `
-      <div class="champ-card-emoji">${c.emoji}</div>
+      <div class="champ-card-emoji">${champVisual(id, c.emoji, 'card-img')}</div>
       <div class="champ-card-name">${c.name}</div>
       <div class="champ-card-class">${c.class}</div>
       <div class="champ-card-element el-${c.element}">${c.element}</div>`;
@@ -246,7 +272,9 @@ function showChampDetail(id) {
   const c = CHAMPIONS[id];
   const panel = el('champ-detail');
   panel.style.display = '';
-  el('cd-emoji').textContent = c.emoji;
+  const cdSrc = champImgSrc(id);
+  if (cdSrc) { el('cd-emoji').innerHTML = `<img src="${cdSrc}" style="width:52px;height:52px;object-fit:cover;border-radius:8px;" alt="">`; }
+  else { el('cd-emoji').textContent = c.emoji; }
   el('cd-name').textContent = c.name;
   el('cd-title').textContent = c.title;
   el('cd-class').textContent = `${c.class} · ${c.element}`;
@@ -375,7 +403,7 @@ function buildBoard(boardId, state, mode = 'game') {
         const shortName = (champDef.name || piece.championId).slice(0,5).toUpperCase();
         pieceEl.innerHTML = `
           <div class="piece-statuses">${statusIcons}</div>
-          <div class="piece-emoji">${champDef.emoji || '❓'}</div>
+          <div class="piece-emoji">${isShadow ? (champDef.emoji || '👤') : champVisual(piece.championId, champDef.emoji, 'piece-img')}</div>
           <div class="piece-name-mini">${isShadow ? 'OMB' : shortName}</div>
           <div class="piece-hp-bar"><div class="piece-hp-fill ${fillClass}" style="width:${pct}%"></div></div>`;
 
@@ -551,7 +579,7 @@ function renderActionPanel(piece) {
   el('active-piece-info').innerHTML = `
     <div class="active-piece-card">
       <div class="apc-header">
-        <span class="apc-emoji">${champDef.emoji||'?'}</span>
+        <span class="apc-emoji">${champVisual(piece.championId, champDef.emoji||'?', 'apc-img')}</span>
         <div>
           <div class="apc-name">${champDef.name||piece.championId}</div>
           <div class="apc-class">${champDef.class||''} · ${champDef.element||''}</div>
@@ -608,7 +636,7 @@ function showHoveredPiece(piece) {
   el('hovered-piece-info').innerHTML = `
     <div class="hover-piece-card">
       <div class="hpc-header">
-        <span class="hpc-emoji">${champDef.emoji||'?'}</span>
+        <span class="hpc-emoji">${champVisual(piece.championId, champDef.emoji||'?', 'hpc-img')}</span>
         <div>
           <div class="hpc-name">${champDef.name||piece.championId}</div>
           <div class="hpc-hp">❤️ ${piece.hp}/${piece.maxHp}</div>
@@ -656,7 +684,8 @@ function renderTurnOrderBar(state) {
     if (!p) return '';
     const champDef = CHAMPIONS[p.championId] || {};
     const isCurrent = id === state.currentPieceId;
-    return `<div class="turn-chip ${p.team}-piece ${isCurrent?'active-turn':''} ${!p.alive?'dead-piece':''}" title="${champDef.name||id}">${champDef.emoji||'?'}</div>`;
+    const chipVis = champVisual(p.championId, champDef.emoji||'?', 'chip-img');
+    return `<div class="turn-chip ${p.team}-piece ${isCurrent?'active-turn':''} ${!p.alive?'dead-piece':''}" title="${champDef.name||id}">${chipVis}</div>`;
   }).join('');
 }
 
@@ -1039,11 +1068,12 @@ el('btn-surrender')?.addEventListener('click', () => {
 // ── Animation state ────────────────────────────────────────────
 let prevCurrentPieceId = null;
 
-function showTurnBanner(emoji, name, isMyTurn) {
+function showTurnBanner(champId, name, isMyTurn) {
   const b = document.getElementById('turn-banner');
   if (!b) return;
   b.className = 'turn-banner' + (isMyTurn ? '' : ' enemy-turn');
-  b.innerHTML = `<span class="tb-emoji">${emoji}</span><div><div class="tb-name">${name}</div><div class="tb-label">${isMyTurn ? '⚔️ Votre tour !' : '🛡️ Tour adverse'}</div></div>`;
+  const visual = champVisual(champId, CHAMPIONS[champId]?.emoji || '⚔️', 'tb-img');
+  b.innerHTML = `<span class="tb-emoji">${visual}</span><div><div class="tb-name">${name}</div><div class="tb-label">${isMyTurn ? '⚔️ Votre tour !' : '🛡️ Tour adverse'}</div></div>`;
   b.classList.add('show');
   setTimeout(() => { b.classList.remove('show'); }, 2100);
 }
@@ -1127,7 +1157,7 @@ socket.on('rb:state', (state) => {
     const cp = state.pieces?.find(p => p.id === state.currentPieceId);
     const def = CHAMPIONS[cp?.championId] || {};
     const isMyTurn = cp?.team === S.myTeam;
-    showTurnBanner(def.emoji || '⚔️', def.name || cp?.championId || '?', isMyTurn);
+    showTurnBanner(cp?.championId || '', def.name || cp?.championId || '?', isMyTurn);
   }
 
   if (state.phase === 'lobby' || state.phase === 'draft' && !el('screen-draft').classList.contains('active')) {
