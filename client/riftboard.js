@@ -8,22 +8,26 @@ const socket = io('/rb');
 socket.on('connect', () => {
   const savedRoom = sessionStorage.getItem('rb_room');
   const savedId   = sessionStorage.getItem('rb_myId');
-  if (savedRoom && savedId && savedId !== socket.id) {
+  const savedName = sessionStorage.getItem('rb_myName');
+  // Toujours tenter un rejoin si on a des données sauvegardées (pas de check savedId===socket.id)
+  if (savedRoom && (savedId || savedName)) {
     S.myId = socket.id;
     S.roomCode = savedRoom;
-    socket.emit('rb:rejoin', { roomCode: savedRoom, previousId: savedId });
+    socket.emit('rb:rejoin', { roomCode: savedRoom, previousId: savedId, playerName: savedName });
   }
 });
 socket.on('reconnect_failed', () => {
   showToast('❌ Reconnexion impossible. Actualisez la page.', 'error');
 });
-socket.on('rb:reconnected', ({ message }) => {
+// Reçu UNIQUEMENT par le joueur qui se reconnecte
+socket.on('rb:reconnected', ({ team, playerName }) => {
   sessionStorage.setItem('rb_myId', socket.id);
   S.myId = socket.id;
-  const savedTeam = sessionStorage.getItem('rb_myTeam');
-  if (savedTeam) S.myTeam = savedTeam;
-  showToast(message || 'Reconnexion réussie !', 'success');
+  if (team) { S.myTeam = team; sessionStorage.setItem('rb_myTeam', team); }
+  showToast(`✅ Reconnexion réussie (${playerName || ''})`, 'success');
 });
+// Notification pour l'autre joueur
+socket.on('rb:player_reconnected', ({ message }) => showToast(message, 'info'));
 socket.on('rb:player_disconnected', ({ message }) => showToast(message, 'warn'));
 
 // ── State ──────────────────────────────────────────────────────
@@ -1399,9 +1403,11 @@ socket.on('rb:created', ({ roomCode, state }) => {
   S.myId = socket.id;
   S.roomCode = roomCode;
   S.myTeam = state.players.find(p => p.id === S.myId)?.team || 'blue';
+  const myPlayer = state.players.find(p => p.id === S.myId);
   sessionStorage.setItem('rb_room', roomCode);
   sessionStorage.setItem('rb_myId', socket.id);
   sessionStorage.setItem('rb_myTeam', S.myTeam);
+  if (myPlayer?.name) sessionStorage.setItem('rb_myName', myPlayer.name);
   showScreen('screen-waiting');
   renderWaiting(state);
 });
@@ -1410,9 +1416,11 @@ socket.on('rb:joined', ({ roomCode, state }) => {
   S.myId = socket.id;
   S.roomCode = roomCode;
   S.myTeam = state.players.find(p => p.id === S.myId)?.team || 'red';
+  const myPlayer = state.players.find(p => p.id === S.myId);
   sessionStorage.setItem('rb_room', roomCode);
   sessionStorage.setItem('rb_myId', socket.id);
   sessionStorage.setItem('rb_myTeam', S.myTeam);
+  if (myPlayer?.name) sessionStorage.setItem('rb_myName', myPlayer.name);
   showScreen('screen-waiting');
   renderWaiting(state);
 });

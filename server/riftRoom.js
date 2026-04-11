@@ -103,15 +103,29 @@ class RiftRoom {
     }
   }
 
-  rejoinPlayer(oldId, newSocket) {
-    const player = this.players.get(oldId);
+  rejoinPlayer(oldId, newSocket, playerName) {
+    // Chercher d'abord par socket ID
+    let player = this.players.get(oldId);
+    let foundOldId = oldId;
+
+    // Fallback : chercher par nom si l'ID ne correspond pas
+    if (!player && playerName) {
+      for (const [id, p] of this.players) {
+        if (p.name === playerName) { player = p; foundOldId = id; break; }
+      }
+    }
+
     if (!player) return { error: 'Joueur introuvable (reconnexion impossible)' };
+
     const newId = newSocket.id;
-    player.id = newId;
+    // Si même socket ID (Socket.io a réutilisé l'ID), juste mettre à jour la socket
+    if (foundOldId !== newId) {
+      player.id = newId;
+      this.players.delete(foundOldId);
+      this.players.set(newId, player);
+      if (this.hostId === foundOldId) this.hostId = newId;
+    }
     player.socket = newSocket;
-    this.players.delete(oldId);
-    this.players.set(newId, player);
-    if (this.hostId === oldId) this.hostId = newId;
     this.log.push(`${player.name} s'est reconnecté.`);
     return { ok: true, player };
   }

@@ -93,18 +93,43 @@ function initRiftGame(io) {
     });
 
     // ── Reconnect ──────────────────────────────────────────────
-    socket.on('rb:rejoin', ({ roomCode, previousId }) => {
+    socket.on('rb:rejoin', ({ roomCode, previousId, playerName }) => {
       const r = getRoom((roomCode || '').toUpperCase());
       if (!r) return socket.emit('rb:error', { message: 'Room introuvable' });
-      // Cancel pending disconnect timer
-      if (r._reconnectTimers?.has(previousId)) {
+
+      // Annuler le timer de déco — chercher par ID ET par nom (fallback)
+      r._reconnectTimers = r._reconnectTimers || new Map();
+      if (previousId && r._reconnectTimers.has(previousId)) {
         clearTimeout(r._reconnectTimers.get(previousId));
         r._reconnectTimers.delete(previousId);
+      } else if (playerName) {
+        // Chercher le timer par nom de joueur
+        for (const [id, p] of r.players) {
+          if (p.name === playerName && r._reconnectTimers.has(id)) {
+            clearTimeout(r._reconnectTimers.get(id));
+            r._reconnectTimers.delete(id);
+            break;
+          }
+        }
       }
-      const result = r.rejoinPlayer(previousId, socket);
+
+      const result = r.rejoinPlayer(previousId, socket, playerName);
       if (result.error) return socket.emit('rb:error', { message: result.error });
+
       socket.data.rbRoom = r.code;
-      r.broadcast('rb:reconnected', { message: `${result.player.name} s'est reconnecté.` });
+
+      // Notifier UNIQUEMENT le joueur reconnecté avec son identité
+      socket.emit('rb:reconnected', {
+        team: result.player.team,
+        playerName: result.player.name,
+      });
+      // Notifier l'adversaire
+      for (const [id, p] of r.players) {
+        if (id !== socket.id) {
+          p.socket.emit('rb:player_reconnected', { message: `${result.player.name} s'est reconnecté.` });
+        }
+      }
+
       if (r.phase === 'placement') { r.broadcastPlacement(); }
       else { r.broadcastState(); }
     });
