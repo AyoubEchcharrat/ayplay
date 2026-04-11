@@ -456,19 +456,19 @@ const CHAMPIONS = {
         desc: 'Soin ciblé à portée 3 : soigne un allié (350 PV) ou blesse un ennemi (200 PV). Soigne aussi Aelys elle-même si elle se cible.',
         targeting: 'single',
         range: 3,
-        cd: 0,
+        cd: 2,
         effects: [
           { type: 'heal_or_damage', healBase: 350, dmgBase: 200, scaling: 'rm' },
         ],
       },
       s2: {
-        name: 'Croix de Lumière',
-        desc: 'Croix diagonale de lumière : soigne les alliés (150) ou blesse les ennemis (150).',
-        targeting: 'all_diag',
-        range: 2,
-        cd: 2,
+        name: 'Aura Sacrée',
+        desc: 'Aelys s\'enveloppe de lumière : +10% ATK et RM, -5% dégâts reçus pendant 2 tours.',
+        targeting: 'self',
+        range: 0,
+        cd: 3,
         effects: [
-          { type: 'heal_or_damage', healBase: 150, dmgBase: 150, scaling: 'rm' },
+          { type: 'self_buff', atkPct: 0.10, rmPct: 0.10, dmgReducPct: 0.05, duration: 2 },
         ],
       },
       ultim: {
@@ -611,7 +611,7 @@ const CHAMPIONS = {
         desc: 'Éclair en ligne rebondissant sur 2 cibles supplémentaires à 70% des dégâts.',
         targeting: 'line',
         range: 5,
-        cd: 0,
+        cd: 2,
         effects: [
           { type: 'damage', base: 300, scaling: 'rm' },
           { type: 'chain', bounces: 2, mult: 0.7 },

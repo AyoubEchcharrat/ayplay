@@ -78,7 +78,7 @@ const CHAMPIONS = {
     stats:{hp:3800,atk:180,arm:90,rm:60,spd:1,move:2,atkRange:1} },
   aelys:  { name:'Aelys',  title:'La Gardienne',             class:'Support',       element:'lumière',emoji:'✨', spd:3,
     s1:{name:'Rayon de Soin',       desc:'Soin ciblé à portée 3 : soigne un allié (350 PV) ou blesse un ennemi (200 PV).'},
-    s2:{name:'Croix de Lumière',    desc:'Diagonales: soigne alliés 150 PV, blesse ennemis.'},
+    s2:{name:'Aura Sacrée',         desc:'Self: +10% ATK & RM, -5% dégâts reçus pendant 2 tours.'},
     u:{name:'Renaissance',          desc:'Ressuscite un allié éliminé avec 600 PV. (1×/game)'},
     stats:{hp:1400,atk:160,arm:35,rm:65,spd:3,move:2,atkRange:2} },
   rohn:   { name:'Rohn',   title:'Le Traqueur',              class:'Chasseur',      element:'nature', emoji:'🏹', spd:4,
@@ -549,9 +549,15 @@ function onPieceClick(piece, cellEl, r, c, mode) {
     return;
   }
   if (S.selectedAction === 'ultim' && !piece.alive && piece.team === S.myTeam) {
-    // Aelys resurrection targets dead ally
+    // Aelys resurrection — envoyer l'ID du mort pour le resurrect
     triggerSpellAnim(cp.championId, 'ultim', cp, r, c);
-    socket.emit('rb:spell', { pieceId: cp.id, spellKey: 'ultim', targetRow: r, targetCol: c });
+    socket.emit('rb:spell', {
+      pieceId: cp.id,
+      spellKey: 'ultim',
+      targetRow: r,
+      targetCol: c,
+      extra: { targetPieceId: piece.id },
+    });
     S.selectedAction = null;
     clearHighlights('board-game');
     return;
@@ -1063,7 +1069,7 @@ function getSpellTargeting(champId, spellKey) {
     velara: {s1:'line', s2:'aoe_self', ultim:'single_ally'},
     pyrox:  {s1:'line', s2:'all_diag', ultim:'self'},
     gorath: {s1:'adjacent', s2:'self', ultim:'self'},
-    aelys:  {s1:'single', s2:'all_diag', ultim:'dead_ally'},
+    aelys:  {s1:'single', s2:'self', ultim:'dead_ally'},
     rohn:   {s1:'line', s2:'two_diag_place', ultim:'single'},
     vek:    {s1:'adjacent', s2:'front_arc', ultim:'self'},
     zhen:   {s1:'line', s2:'diag_jump', ultim:'self'},

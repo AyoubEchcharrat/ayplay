@@ -547,7 +547,10 @@ class RiftRoom {
     if (!piece.alive) return 0;
     // Bastion: negate damage and reflect
     if (this.hasStatus(piece, 'bastion')) return 0;
-    const actual = Math.max(0, Math.floor(amount));
+    // Réduction de dégâts (ex: Aura Sacrée d'Aelys)
+    let reduced = amount;
+    if (piece.dmgReduction > 0) reduced = Math.floor(reduced * (1 - piece.dmgReduction));
+    const actual = Math.max(0, Math.floor(reduced));
     piece.hp -= actual;
 
     // Losing invisibility when hit
@@ -1168,25 +1171,21 @@ class RiftRoom {
       }
 
       case 'chain': {
-        // Lightning chain: bounces to nearby targets
+        // Lightning chain: bounces only (primary target already hit by 'damage' effect)
         const bounces = effect.bounces || 2;
         const mult = effect.mult || 0.7;
         const dmgEffect = spell.effects.find(e => e.type === 'damage');
         if (!dmgEffect) break;
 
-        // Primary target
         const primaryTarget = this._getPieceAt(targetRow, targetCol);
         if (!primaryTarget || primaryTarget.team === caster.team) break;
 
-        const chainTargets = [primaryTarget];
+        // Bounces only — primary target was already handled by 'damage' effect
         const hitIds = new Set([primaryTarget.id]);
-
         let currentPiece = primaryTarget;
-        let currentDmg = dmgEffect.base || 0;
+        let chainDmg = Math.floor((dmgEffect.base || 0) * mult); // first bounce = base * mult
 
         for (let b = 0; b < bounces; b++) {
-          currentDmg = Math.floor(currentDmg * mult);
-          // Find nearest unhit enemy
           let nearest = null;
           let nearestDist = Infinity;
           for (const p of this.pieces.values()) {
@@ -1195,16 +1194,11 @@ class RiftRoom {
             if (d < nearestDist && d <= 3) { nearest = p; nearestDist = d; }
           }
           if (!nearest) break;
-          chainTargets.push(nearest);
+          const dmg = calcMagicDmg(chainDmg, nearest.rm, 0);
+          const actual = this._applyDamage(nearest, dmg);
+          this.log.push(`⚡ Chaîne: ${this._pieceName(nearest)} subit ${actual} dégâts.`);
           hitIds.add(nearest.id);
           currentPiece = nearest;
-        }
-
-        let chainDmg = dmgEffect.base || 0;
-        for (const t of chainTargets) {
-          const dmg = calcMagicDmg(chainDmg, t.rm, 0);
-          const actual = this._applyDamage(t, dmg);
-          this.log.push(`Chaîne d'éclairs: ${this._pieceName(t)} subit ${actual} dégâts.`);
           chainDmg = Math.floor(chainDmg * mult);
         }
         break;
@@ -1624,6 +1618,19 @@ class RiftRoom {
         break;
       }
 
+      case 'self_buff': {
+        // Buff personnel (Aelys Aura Sacrée) : +ATK%, +RM%, -X% dégâts reçus
+        const atkBonus = Math.floor(caster.atk * (effect.atkPct || 0));
+        const rmBonus  = Math.floor(caster.rm  * (effect.rmPct  || 0));
+        caster.atk += atkBonus;
+        caster.rm  += rmBonus;
+        caster.dmgReduction = (caster.dmgReduction || 0) + (effect.dmgReducPct || 0);
+        this.addStatus(caster, 'bénédiction', effect.duration || 2,
+          { atkBonus, rmBonus, dmgReducPct: effect.dmgReducPct || 0 });
+        this.log.push(`✨ ${this._pieceName(caster)}: Aura Sacrée! +${atkBonus} ATK, +${rmBonus} RM, -${Math.round((effect.dmgReducPct||0)*100)}% dégâts reçus.`);
+        break;
+      }
+
       case 'ally_atk_buff': {
         const target = this._getPieceAt(targetRow, targetCol);
         if (!target || target.team !== caster.team || !target.alive) break;
@@ -1818,6 +1825,14 @@ class RiftRoom {
         piece.bonusMove = Math.max(0, (piece.bonusMove || 0) - 1);
         this.log.push(`La bénédiction des marées de ${this._pieceName(piece)} expire.`);
         break;
+      case 'bénédiction': {
+        const v = status.value || {};
+        piece.atk = Math.max(0, piece.atk - (v.atkBonus || 0));
+        piece.rm  = Math.max(0, piece.rm  - (v.rmBonus  || 0));
+        piece.dmgReduction = Math.max(0, (piece.dmgReduction || 0) - (v.dmgReducPct || 0));
+        this.log.push(`L'Aura Sacrée de ${this._pieceName(piece)} expire.`);
+        break;
+      }
     }
   }
 
