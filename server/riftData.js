@@ -53,15 +53,15 @@ const BASE_TERRAIN = buildBaseTerrain();
 // ---------------------------------------------------------------------------
 
 const FOUNTAINS_BLUE = [
-  { row: 12, col: 2,  hp: 3000 },
-  { row: 12, col: 6,  hp: 5000 },
-  { row: 12, col: 10, hp: 3000 },
+  { row: 12, col: 2,  hp: 500  },   // extérieure gauche
+  { row: 12, col: 6,  hp: 1000 },   // intérieure centrale
+  { row: 12, col: 10, hp: 500  },   // extérieure droite
 ];
 
 const FOUNTAINS_RED = [
-  { row: 0, col: 2,  hp: 3000 },
-  { row: 0, col: 6,  hp: 5000 },
-  { row: 0, col: 10, hp: 3000 },
+  { row: 0, col: 2,  hp: 500  },
+  { row: 0, col: 6,  hp: 1000 },
+  { row: 0, col: 10, hp: 500  },
 ];
 
 // Apply fountain overrides to the terrain grid (fountain cells are still 'base' zone,
@@ -463,12 +463,12 @@ const CHAMPIONS = {
       },
       s2: {
         name: 'Aura Sacrée',
-        desc: 'Aelys s\'enveloppe de lumière : +10% ATK et RM, -5% dégâts reçus pendant 2 tours.',
-        targeting: 'self',
-        range: 0,
+        desc: 'Insuffle une aura à un allié (ou elle-même) : +10% ATK & RM, -5% dégâts reçus pendant 2 tours.',
+        targeting: 'single_ally',
+        range: 3,
         cd: 3,
         effects: [
-          { type: 'self_buff', atkPct: 0.10, rmPct: 0.10, dmgReducPct: 0.05, duration: 2 },
+          { type: 'ally_aura_buff', atkPct: 0.10, rmPct: 0.10, dmgReducPct: 0.05, duration: 2 },
         ],
       },
       ultim: {

@@ -1618,16 +1618,19 @@ class RiftRoom {
         break;
       }
 
-      case 'self_buff': {
-        // Buff personnel (Aelys Aura Sacrée) : +ATK%, +RM%, -X% dégâts reçus
-        const atkBonus = Math.floor(caster.atk * (effect.atkPct || 0));
-        const rmBonus  = Math.floor(caster.rm  * (effect.rmPct  || 0));
-        caster.atk += atkBonus;
-        caster.rm  += rmBonus;
-        caster.dmgReduction = (caster.dmgReduction || 0) + (effect.dmgReducPct || 0);
-        this.addStatus(caster, 'bénédiction', effect.duration || 2,
+      case 'ally_aura_buff': {
+        // Aelys Aura Sacrée : cible un allié ou elle-même
+        const auraTarget = this._getPieceAt(targetRow, targetCol);
+        const buffPiece  = (auraTarget && auraTarget.team === caster.team && auraTarget.alive)
+                           ? auraTarget : caster;
+        const atkBonus = Math.floor(buffPiece.atk * (effect.atkPct || 0));
+        const rmBonus  = Math.floor(buffPiece.rm  * (effect.rmPct  || 0));
+        buffPiece.atk += atkBonus;
+        buffPiece.rm  += rmBonus;
+        buffPiece.dmgReduction = (buffPiece.dmgReduction || 0) + (effect.dmgReducPct || 0);
+        this.addStatus(buffPiece, 'bénédiction', effect.duration || 2,
           { atkBonus, rmBonus, dmgReducPct: effect.dmgReducPct || 0 });
-        this.log.push(`✨ ${this._pieceName(caster)}: Aura Sacrée! +${atkBonus} ATK, +${rmBonus} RM, -${Math.round((effect.dmgReducPct||0)*100)}% dégâts reçus.`);
+        this.log.push(`✨ ${this._pieceName(caster)} bénit ${this._pieceName(buffPiece)}: +${atkBonus} ATK, +${rmBonus} RM, -${Math.round((effect.dmgReducPct||0)*100)}% dégâts reçus.`);
         break;
       }
 

@@ -612,11 +612,17 @@ function onCellClick(r, c, mode) {
     S.selectedAction = null;
     clearHighlights('board-game');
   } else {
-    // Afficher info terrain si case vide
+    // Afficher info terrain ou fontaine si case vide
     const piece = S.gameState?.pieces?.find(p => p.row === r && p.col === c && p.alive);
     if (!piece) {
-      const t = getCellTerrain(S.gameState, r, c);
-      showTerrainToast(t);
+      // Vérifier si c'est une fontaine
+      const fountain = S.gameState?.fountains?.find(f => f.row === r && f.col === c);
+      if (fountain) {
+        showFountainToast(fountain);
+      } else {
+        const t = getCellTerrain(S.gameState, r, c);
+        showTerrainToast(t);
+      }
     }
   }
 }
@@ -1069,7 +1075,7 @@ function getSpellTargeting(champId, spellKey) {
     velara: {s1:'line', s2:'aoe_self', ultim:'single_ally'},
     pyrox:  {s1:'line', s2:'all_diag', ultim:'self'},
     gorath: {s1:'adjacent', s2:'self', ultim:'self'},
-    aelys:  {s1:'single', s2:'self', ultim:'dead_ally'},
+    aelys:  {s1:'single', s2:'single_ally', ultim:'dead_ally'},
     rohn:   {s1:'line', s2:'two_diag_place', ultim:'single'},
     vek:    {s1:'adjacent', s2:'front_arc', ultim:'self'},
     zhen:   {s1:'line', s2:'diag_jump', ultim:'self'},
@@ -1231,6 +1237,15 @@ function triggerHitAnim(piece, dmg) {
 }
 
 // ── Terrain toast ──────────────────────────────────────────────
+function showFountainToast(fountain) {
+  const teamLabel = fountain.team === 'blue' ? '🔵 Bleue' : '🔴 Rouge';
+  const pct       = fountain.maxHp > 0 ? Math.round(fountain.hp / fountain.maxHp * 100) : 0;
+  const bar       = '█'.repeat(Math.round(pct / 10)) + '░'.repeat(10 - Math.round(pct / 10));
+  const isInner   = fountain.maxHp >= 1000;
+  const label     = isInner ? 'Fontaine Centrale' : 'Fontaine Extérieure';
+  showToast(`⛲ ${label} (${teamLabel}) — ${fountain.hp}/${fountain.maxHp} PV  [${bar}] ${pct}%`, '');
+}
+
 function showTerrainToast(terrain) {
   const info = {
     lane:    { e:'🟫', n:'Terrain neutre',   d:'Aucun bonus ni malus.' },
