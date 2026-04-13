@@ -21,6 +21,9 @@ const io     = new Server(server);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client')));
 
+// ── Keep-alive (Render free tier déprécie après 15 min sans requête HTTP) ──
+app.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
+
 // ── API RPG (génératif via Claude) ────────────────────────────────
 const rpgRouter = require('./rpg');
 app.use('/api/rpg', rpgRouter);

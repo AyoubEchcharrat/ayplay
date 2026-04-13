@@ -171,6 +171,7 @@ class RiftRoom {
       traps:     this.traps,
       trails:    this.trails,
       waterTrails: this.waterTrails || [],
+      shadowZones: this.shadowZones || [],
       turnOrder: this.turnOrder,
       currentPieceId,
       currentTeam,
@@ -291,14 +292,16 @@ class RiftRoom {
       atkRange: champDef.stats.atkRange,
       alive: true,
       statuses: [],
-      spellCooldowns: { s1: 0, s2: 0, ultim: 0 },
+      spellCooldowns: { s1: 0, s2: 0, ultim: 6 }, // ultim disponible au 7e tour complet
       actedThisTurn: { moveUsed: 0, attacked: false, spelled: false },
       hasShadow: false, shadowId: null,
+      hasShadow2: false, shadow2Id: null,
       isAnchor: false,
       bastionActive: false, bastionTurns: 0,
       rageActive: false, rageTurns: 0, rageKills: 0,
       markTarget: null, markTurns: 0,
       ultUsed: false,
+      dmgReduction: 0,
     };
 
     this.pieces.set(piece.id, piece);
@@ -399,7 +402,9 @@ class RiftRoom {
     let move = piece.move + (piece.bonusMove || 0);
     if (this.hasStatus(piece, 'ralenti')) move -= 1;
     if (this.hasStatus(piece, 'gelé')) move -= 1;
-    if (this.hasStatus(piece, 'invisible')) move = Math.min(move, 2);
+
+    // Zone d'ombre : déplacement réduit de moitié (arrondi vers le bas, min 1)
+    if (this._isInShadowZone(piece)) move = Math.max(1, Math.floor(move / 2));
 
     // Rohn mark bonus: +1 move for Rohn himself when marking
     if (piece.championId === 'rohn' && piece.markTarget) move += 1;
@@ -566,6 +571,14 @@ class RiftRoom {
     return actual;
   }
 
+  // Vérifie si une pièce est dans une zone d'ombre ennemie
+  _isInShadowZone(piece) {
+    return (this.shadowZones || []).some(z =>
+      z.team !== piece.team &&
+      chebyshev(piece.row, piece.col, z.row, z.col) <= z.radius
+    );
+  }
+
   _applyDamageToFountain(fountain, amount) {
     if (fountain.hp <= 0) return;
     fountain.hp = Math.max(0, fountain.hp - Math.floor(amount));
@@ -628,6 +641,11 @@ class RiftRoom {
 
     const piece = this.pieces.get(pieceId);
     if (piece.actedThisTurn.attacked) return { error: 'Déjà attaqué ce tour' };
+
+    // Effrayé : ne peut pas attaquer
+    if (this.hasStatus(piece, 'effrayé')) return { error: 'Pièce effrayée — ne peut pas attaquer' };
+    // Zone d'ombre : ne peut pas attaquer
+    if (this._isInShadowZone(piece)) return { error: 'Zone d\'ombre — attaque impossible ici' };
 
     // Check provoqué: must attack the provoking target
     const provoqueStatus = piece.statuses.find(s => s.name === 'provoqué');
@@ -692,6 +710,14 @@ class RiftRoom {
       const actualDmg = this._applyDamage(targetPiece, effectiveDmg);
       this.log.push(`⚔️ ${this._pieceName(piece)} attaque ${this._pieceName(targetPiece)} → ${actualDmg} dégâts (PV restant: ${targetPiece.hp}).`);
 
+      // Vol de vie via bénédiction (Vek ultim : lifeStealPct)
+      const beniStatus = piece.statuses.find(s => s.name === 'bénédiction');
+      if (beniStatus?.value?.lifeStealPct > 0 && actualDmg > 0) {
+        const lsHeal = Math.floor(actualDmg * beniStatus.value.lifeStealPct);
+        piece.hp = Math.min(piece.maxHp, piece.hp + lsHeal);
+        if (lsHeal > 0) this.log.push(`🩸 ${this._pieceName(piece)} vole ${lsHeal} PV.`);
+      }
+
       // Vek rage splash: also hit 2 diagonal-front cells
       if (piece.rageActive && targetPiece.alive !== false) {
         const dr = Math.sign(targetRow - piece.row);
@@ -751,6 +777,8 @@ class RiftRoom {
     const piece = this.pieces.get(pieceId);
     if (piece.actedThisTurn.spelled) return { error: 'Déjà lancé un sort ce tour' };
     if (this.hasStatus(piece, 'étourdi')) return { error: 'Pièce étourdie, ne peut pas agir' };
+    if (this.hasStatus(piece, 'effrayé')) return { error: 'Pièce effrayée — ne peut pas lancer de sorts' };
+    if (this._isInShadowZone(piece)) return { error: 'Zone d\'ombre — sorts impossibles ici' };
 
     const champDef = CHAMPIONS[piece.championId];
     if (!champDef) return { error: 'Champion introuvable' };
@@ -1402,18 +1430,24 @@ class RiftRoom {
       }
 
       case 'aoe_all': {
-        // Pyrox ultim: hit all pieces in radius including allies
+        // AoE autour du lanceur — Pyrox (friendlyFire:true) ou Gavik ultim (enemiesOnly)
         const radius = effect.radius || 3;
         const base = effect.base || 500;
         const scaling = effect.scaling || 'rm';
+        const friendlyFire = effect.friendlyFire !== false; // default true (Pyrox)
         for (const p of this.pieces.values()) {
           if (!p.alive) continue;
           if (p.id === caster.id) continue;
           if (chebyshev(caster.row, caster.col, p.row, p.col) <= radius) {
+            if (!friendlyFire && p.team === caster.team) continue;
             const arm = scaling === 'rm' ? p.rm : p.arm;
             const dmg = scaling === 'rm' ? calcMagicDmg(base, arm, 0) : calcPhysDmg(base, arm, 0);
             const actual = this._applyDamage(p, dmg);
-            this.log.push(`Éruption: ${this._pieceName(p)} subit ${actual} dégâts.`);
+            this.log.push(`💥 ${this._pieceName(p)} subit ${actual} dégâts (AoE).`);
+            // Appliquer un statut à tous les ennemis si demandé
+            if (effect.applyStatus && p.team !== caster.team) {
+              this.addStatus(p, effect.applyStatus.name, effect.applyStatus.duration || 1, effect.applyStatus.value);
+            }
           }
         }
         break;
@@ -1619,18 +1653,95 @@ class RiftRoom {
       }
 
       case 'ally_aura_buff': {
-        // Aelys Aura Sacrée : cible un allié ou elle-même
+        // Buff ciblé (Aelys/Gorath/Vek) — cible un allié ou soi-même (self targeting)
         const auraTarget = this._getPieceAt(targetRow, targetCol);
         const buffPiece  = (auraTarget && auraTarget.team === caster.team && auraTarget.alive)
                            ? auraTarget : caster;
-        const atkBonus = Math.floor(buffPiece.atk * (effect.atkPct || 0));
-        const rmBonus  = Math.floor(buffPiece.rm  * (effect.rmPct  || 0));
+        const atkBonus  = Math.floor(buffPiece.atk * (effect.atkPct || 0));
+        const rmBonus   = Math.floor(buffPiece.rm  * (effect.rmPct  || 0));
+        const movBonus  = effect.movBonus || 0;
+        const lsPct     = effect.lifeStealPct || 0;
         buffPiece.atk += atkBonus;
         buffPiece.rm  += rmBonus;
+        if (movBonus) buffPiece.bonusMove = (buffPiece.bonusMove || 0) + movBonus;
         buffPiece.dmgReduction = (buffPiece.dmgReduction || 0) + (effect.dmgReducPct || 0);
         this.addStatus(buffPiece, 'bénédiction', effect.duration || 2,
-          { atkBonus, rmBonus, dmgReducPct: effect.dmgReducPct || 0 });
-        this.log.push(`✨ ${this._pieceName(caster)} bénit ${this._pieceName(buffPiece)}: +${atkBonus} ATK, +${rmBonus} RM, -${Math.round((effect.dmgReducPct||0)*100)}% dégâts reçus.`);
+          { atkBonus, rmBonus, dmgReducPct: effect.dmgReducPct || 0, movBonus, lifeStealPct: lsPct });
+        const parts = [];
+        if (atkBonus) parts.push(`+${atkBonus} ATK`);
+        if (rmBonus)  parts.push(`+${rmBonus} RM`);
+        if (movBonus) parts.push(`+${movBonus} mvt`);
+        if (effect.dmgReducPct) parts.push(`-${Math.round(effect.dmgReducPct*100)}% dégâts reçus`);
+        if (lsPct) parts.push(`vol de vie ${Math.round(lsPct*100)}%`);
+        this.log.push(`✨ ${this._pieceName(caster)} bénit ${this._pieceName(buffPiece)}: ${parts.join(', ')}.`);
+        break;
+      }
+
+      case 'summon_shadow2': {
+        // Invoque l'Ombre Supérieure (sayl_shadow2)
+        if (caster.hasShadow2 && caster.shadow2Id) {
+          const existing = this.pieces.get(caster.shadow2Id);
+          if (existing && existing.alive) {
+            existing.row = targetRow; existing.col = targetCol;
+            this.log.push(`${this._pieceName(caster)} redéploie son Ombre Supérieure!`);
+            break;
+          }
+        }
+        // Vérifier que la case cible est libre
+        if (this._getPieceAt(targetRow, targetCol) || this._getFountainAt(targetRow, targetCol)
+            || this.walls.some(w => w.r === targetRow && w.c === targetCol)) {
+          break; // case occupée, silencieux
+        }
+        const shadow2Id = `${caster.team}_sayl_shadow2`;
+        const shadow2 = {
+          id: shadow2Id,
+          championId: 'sayl_shadow2',
+          team: caster.team,
+          row: targetRow, col: targetCol,
+          hp: 900, maxHp: 900,
+          atk: Math.floor(caster.atk * 0.7),
+          arm: 5, rm: 40,
+          spd: Math.min(caster.spd + 1, 6), move: 3, atkRange: 2,
+          alive: true,
+          statuses: [],
+          spellCooldowns: { s1: 0, ultim: 6 },
+          actedThisTurn: { moveUsed: 0, attacked: false, spelled: false },
+          hasShadow: false, shadowId: null, hasShadow2: false, shadow2Id: null,
+          isAnchor: false, bastionActive: false, bastionTurns: 0,
+          rageActive: false, rageTurns: 0, rageKills: 0,
+          markTarget: null, markTurns: 0, ultUsed: false,
+          isShadow: true, isShadow2: true, ownerId: caster.id,
+          dmgReduction: 0,
+        };
+        this.pieces.set(shadow2Id, shadow2);
+        const idx = this.turnOrder.indexOf(caster.id);
+        this.turnOrder.splice(idx + 1, 0, shadow2Id);
+        caster.hasShadow2 = true;
+        caster.shadow2Id = shadow2Id;
+        this.log.push(`🌑 ${this._pieceName(caster)} invoque son Ombre Supérieure!`);
+        break;
+      }
+
+      case 'effroi': {
+        // Ombre Supérieure S1 : cible un ennemi et l'effraie
+        const fearTarget = this._getPieceAt(targetRow, targetCol);
+        if (!fearTarget || fearTarget.team === caster.team || !fearTarget.alive) break;
+        this.addStatus(fearTarget, 'effrayé', 1);
+        this.log.push(`😱 ${this._pieceName(fearTarget)} est effrayé par ${this._pieceName(caster)} — ne peut plus attaquer ni lancer de sorts!`);
+        break;
+      }
+
+      case 'zone_ombre': {
+        // Ombre Supérieure ultim : déploie une zone 3×3 (chebyshev ≤ 1)
+        this.shadowZones = this.shadowZones || [];
+        this.shadowZones.push({
+          row: caster.row, col: caster.col,
+          radius: 1,
+          team: caster.team,
+          castAtRound: this.round,
+          durationRounds: effect.durationRounds || 2,
+        });
+        this.log.push(`🌑 ${this._pieceName(caster)} déploie une Zone des Ténèbres!`);
         break;
       }
 
@@ -1784,6 +1895,17 @@ class RiftRoom {
         }
       }
 
+      // Expiration des zones d'ombre (basée sur les tours complets)
+      if (this.shadowZones?.length) {
+        this.shadowZones = this.shadowZones.filter(z => {
+          if (this.round >= z.castAtRound + z.durationRounds) {
+            this.log.push(`🌑 Zone d'ombre dissipée.`);
+            return false;
+          }
+          return true;
+        });
+      }
+
       this.log.push(`Tour ${this.round} commence.`);
     }
 
@@ -1833,7 +1955,8 @@ class RiftRoom {
         piece.atk = Math.max(0, piece.atk - (v.atkBonus || 0));
         piece.rm  = Math.max(0, piece.rm  - (v.rmBonus  || 0));
         piece.dmgReduction = Math.max(0, (piece.dmgReduction || 0) - (v.dmgReducPct || 0));
-        this.log.push(`L'Aura Sacrée de ${this._pieceName(piece)} expire.`);
+        if (v.movBonus) piece.bonusMove = Math.max(0, (piece.bonusMove || 0) - v.movBonus);
+        this.log.push(`La bénédiction de ${this._pieceName(piece)} expire.`);
         break;
       }
     }

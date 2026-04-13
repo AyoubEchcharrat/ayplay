@@ -46,60 +46,65 @@ const S = {
 
 // Champion definitions (mirrored from server for display)
 const CHAMPIONS = {
-  karek:  { name:'Gavik',  title:'Le Brise-Ligne',         class:'Tank-Guerrier', element:'terre',   emoji:'🪨', spd:2,
-    s1:{name:'Charge Tellurique',   desc:'Fonce en ligne droite sur 4 cases, repousse les ennemis sur le côté et les embrase par friction.'},
-    s2:{name:'Frappe Sismique',     desc:'Frappe en arc avant, ralentit les ennemis 1 tour.'},
-    u:{name:'Pilier de Terre',      desc:'Immobile 2 tours, renvoie 40% des dégâts.'},
-    stats:{hp:2800,atk:220,arm:60,rm:30,spd:2,move:2,atkRange:1} },
+  karek:  { name:'Gavik',  title:'Le Brise-Ligne',         class:'Tank-Guerrier', element:'terre',   emoji:'🪨', spd:3,
+    s1:{name:'Charge Tellurique',   desc:'Fonce en ligne 4 cases, repousse les ennemis sur le côté, embrase 3 rotations.'},
+    s2:{name:'Tremblement de Terre',desc:'AoE rayon 1 autour de lui : dégâts + immobilise les ennemis 1 rotation.'},
+    u:{name:'Éruption Sismique',    desc:'Explosion rayon 2 : dégâts lourds à tous les ennemis + immobilise 1 rotation.'},
+    stats:{hp:2000,atk:260,arm:45,rm:30,spd:3,move:3,atkRange:1} },
   lysha:  { name:'Lysha',  title:'La Lame-Fantôme',         class:'Assassin',      element:'vent',    emoji:'🗡️', spd:5,
     s1:{name:'Bond Diagonal',       desc:'Téléporte en diagonale et attaque en arrivant.'},
-    s2:{name:'Lacération en X',     desc:'4 diagonales: dégâts + saignement 3 tours.'},
+    s2:{name:'Lacération en X',     desc:'4 diagonales: dégâts + saignement 3 rotations.'},
     u:{name:'Lame du Néant',        desc:'Ignore l\'armure. Exécute si cible < 35% PV.'},
     stats:{hp:1300,atk:280,arm:20,rm:25,spd:5,move:3,atkRange:1} },
   sayl:   { name:'Sayl',   title:'Le Tisserand d\'Ombre',   class:'Mage',          element:'ombre',   emoji:'🌑', spd:4,
-    s1:{name:'Invocation d\'Ombre', desc:'Invoque une ombre spectrale sur la case ciblée (portée 2). L\'ombre peut se déplacer, attaquer (50% ATK) et utiliser Désincarnation pour se dissoudre.'},
-    s2:{name:'Transposition',       desc:'Échange instantanément sa position avec celle de l\'ombre invoquée.'},
-    u:{name:'Voile Noir',           desc:'Sayl devient invisible pour l\'adversaire pendant 3 tours (déplacement max 2 cases). L\'invisibilité est brisée si Sayl prend des dégâts.'},
+    s1:{name:'Invocation d\'Ombre', desc:'Invoque une ombre spectrale (portée 2). Elle attaque à 50% ATK.'},
+    s2:{name:'Transposition',       desc:'Échange sa position avec celle de l\'ombre invoquée.'},
+    u:{name:'Ombre Supérieure',     desc:'Invoque une 2e ombre plus puissante (portée 3). Elle peut Effrayer et déployer un Voile des Ténèbres.'},
     stats:{hp:1600,atk:240,arm:25,rm:50,spd:4,move:3,atkRange:2} },
   velara: { name:'Vélara', title:'L\'Ensorcelleuse des Marées', class:'Mage-Support', element:'eau',  emoji:'🌊', spd:3,
-    s1:{name:'Vague Dévastatrice',  desc:'Lance une vague sur 4 cases (8 sur rivière) dans n\'importe quelle direction. Dégâts + recul ennemis. Recul alliés sans dégâts. Éteint Embrasé.'},
-    s2:{name:'Brume Glacée',        desc:'Zone rayon 2 : dégâts magiques + Gelé 2 tours aux ennemis.'},
-    u:{name:'Bénédiction des Marées', desc:'+20 ATK flat +5% ATK +1 mouvement à un allié pendant 2 tours.'},
+    s1:{name:'Vague Dévastatrice',  desc:'Lance une vague sur 4 cases (8 sur rivière). Dégâts + recul ennemis, recul alliés sans dégâts.'},
+    s2:{name:'Brume Glacée',        desc:'Zone rayon 2 : dégâts magiques + Gelé 2 rotations aux ennemis.'},
+    u:{name:'Bénédiction des Marées', desc:'+20 ATK flat +5% ATK +1 mouvement à un allié pendant 2 rotations.'},
     stats:{hp:1700,atk:200,arm:30,rm:55,spd:3,move:2,atkRange:2} },
   pyrox:  { name:'Richard', title:'Cœur de Dragon',          class:'Mage',          element:'feu',    emoji:'🔥', spd:3,
-    s1:{name:'Trait de Feu',        desc:'Tir ligne 6 cases: 350 dégâts + Embrasé.'},
-    s2:{name:'Explosion Diagonale', desc:'2 flammes diagonales avant, AoE à l\'impact.'},
-    u:{name:'Éruption',             desc:'Explosion rayon 3: 500 dégâts à tous, -200 PV soi.'},
+    s1:{name:'Trait de Feu',        desc:'Tir ligne 6 cases : dégâts + Embrasé 3 rotations + traînée de feu.'},
+    s2:{name:'Explosion Diagonale', desc:'Flammes diagonales avec éclaboussure + traînée de feu.'},
+    u:{name:'Éruption',             desc:'Explosion rayon 3: 500 dégâts à tous (feu ami inclus), -200 PV soi.'},
     stats:{hp:1500,atk:260,arm:20,rm:45,spd:3,move:2,atkRange:2} },
-  gorath: { name:'Gorath', title:'La Forteresse',            class:'Tank',          element:'terre',  emoji:'🏰', spd:1,
-    s1:{name:'Mur de Pierre',       desc:'Érige un mur de 3 cases de large pendant 5 tours.'},
-    s2:{name:'Rush de Forteresse',  desc:'+4 déplacement ce tour, -25% ARM/RM jusqu\'au prochain tour.'},
-    u:{name:'Bastion Absolu',       desc:'Invulnérable 2 tours, renvoie 50% des dégâts.'},
-    stats:{hp:3800,atk:180,arm:90,rm:60,spd:1,move:2,atkRange:1} },
+  gorath: { name:'Gorath', title:'Le Briseur de Lignes',     class:'Tank',          element:'terre',  emoji:'🏰', spd:3,
+    s1:{name:'Coup de Masse',       desc:'Frappe adjacente lourde + repousse l\'ennemi de 2 cases.'},
+    s2:{name:'Percée Blindée',      desc:'Charge en ligne 4 cases : dégâts + étourdit 1 rotation tous les ennemis touchés.'},
+    u:{name:'Déchaînement',         desc:'+35% ATK, +1 mouvement, -15% dégâts reçus pendant 2 rotations.'},
+    stats:{hp:2200,atk:240,arm:55,rm:35,spd:3,move:3,atkRange:1} },
   aelys:  { name:'Aelys',  title:'La Gardienne',             class:'Support',       element:'lumière',emoji:'✨', spd:3,
-    s1:{name:'Rayon de Soin',       desc:'Soin ciblé à portée 3 : soigne un allié (350 PV) ou blesse un ennemi (200 PV).'},
-    s2:{name:'Aura Sacrée',         desc:'Self: +10% ATK & RM, -5% dégâts reçus pendant 2 tours.'},
-    u:{name:'Renaissance',          desc:'Ressuscite un allié éliminé avec 600 PV. (1×/game)'},
+    s1:{name:'Rayon de Soin',       desc:'Soin ciblé portée 3 : soigne allié (350 PV) ou blesse ennemi (200 PV).'},
+    s2:{name:'Aura Sacrée',         desc:'Cible un allié (ou soi) portée 3 : +10% ATK & RM, -5% dégâts reçus, 2 rotations.'},
+    u:{name:'Renaissance',          desc:'Ressuscite un allié éliminé avec 600 PV. Aelys étourdie 1 rotation.'},
     stats:{hp:1400,atk:160,arm:35,rm:65,spd:3,move:2,atkRange:2} },
   rohn:   { name:'Rohn',   title:'Le Traqueur',              class:'Chasseur',      element:'nature', emoji:'🏹', spd:4,
     s1:{name:'Flèche Longue Portée',desc:'Tir ligne 7 cases. ×2 dégâts si cible empoisonnée.'},
-    s2:{name:'Piège Diagonal',      desc:'Pose 2 pièges diagonaux: immobilise + 150 dégâts.'},
-    u:{name:'Traque Sans Fin',      desc:'Marque une cible 3 tours: +1 move vers elle, poison auto.'},
+    s2:{name:'Piège Diagonal',      desc:'Pose 2 pièges diagonaux : immobilise + 150 dégâts.'},
+    u:{name:'Traque Sans Fin',      desc:'Marque une cible : +1 mouvement vers elle + poison auto 40/rotation.'},
     stats:{hp:1900,atk:230,arm:40,rm:35,spd:4,move:3,atkRange:3} },
-  vek:    { name:'Vek',    title:'La Bête des Profondeurs',  class:'Tank-Bruiser',  element:'bête',   emoji:'🦷', spd:2,
-    s1:{name:'Morsure Vorace',      desc:'Morsure adjacente : dégâts + saignement 3 tours + vol de vie (30%, 60% si cible saigne déjà).'},
-    s2:{name:'Rugissement',         desc:'3 cases devant: repousse les ennemis d\'1 case.'},
-    u:{name:'Rage des Abysses',     desc:'2 tours: attaques frappent aussi 2 diagonales avant.'},
-    stats:{hp:2600,atk:250,arm:55,rm:40,spd:2,move:2,atkRange:1} },
+  vek:    { name:'Vek',    title:'La Bête des Profondeurs',  class:'Tank-Bruiser',  element:'bête',   emoji:'🦷', spd:3,
+    s1:{name:'Morsure Vorace',      desc:'Morsure adjacente : dégâts + saignement 3 rotations + vol de vie (40%, 70% si cible saigne déjà).'},
+    s2:{name:'Charge Bestiale',     desc:'Fonce sur 3 cases : dégâts + repousse 2 cases + saignement 3 rotations.'},
+    u:{name:'Fureur Bestiale',      desc:'+40% ATK, vol de vie 20% sur attaques, +1 mouvement pendant 3 rotations.'},
+    stats:{hp:2000,atk:280,arm:40,rm:30,spd:3,move:3,atkRange:1} },
   zhen:   { name:'Zhen',   title:'Le Moine de l\'Éclair',   class:'Duelliste',     element:'foudre', emoji:'⚡', spd:4,
-    s1:{name:'Chaîne d\'Éclairs',  desc:'Ligne 5 cases, rebondit 2× en diagonale (70%/rebond).'},
-    s2:{name:'Dash Électrique',     desc:'Dash diagonal 3 cases, traînée électrique derrière.'},
-    u:{name:'Tempête Convergente',  desc:'Éclairs 8 directions, 300 dégâts. Étourdi 1 tour après.'},
+    s1:{name:'Chaîne d\'Éclairs',  desc:'Ligne 5 cases, rebondit 2× sur des cibles proches (70%/rebond).'},
+    s2:{name:'Dash Électrique',     desc:'Dash diagonal 3 cases, traînée électrique ralentit 2 rotations.'},
+    u:{name:'Tempête Convergente',  desc:'Éclairs 8 directions, 300 dégâts. Étourdi 1 rotation après.'},
     stats:{hp:1800,atk:210,arm:35,rm:45,spd:4,move:3,atkRange:2} },
   sayl_shadow: { name:'Ombre', title:'Projection Spectrale', class:'Mage', element:'ombre', emoji:'👤', spd:4,
     s1:{name:'Désincarnation', desc:'Dissout l\'ombre immédiatement.'},
     s2:{name:'',desc:''}, u:{name:'',desc:''},
     stats:{hp:600,atk:120,arm:0,rm:0,spd:4,move:2,atkRange:1} },
+  sayl_shadow2: { name:'Ombre Supérieure', title:'Émanation Obscure', class:'Mage', element:'ombre', emoji:'🌑', spd:5,
+    s1:{name:'Effroi',           desc:'Terrifie un ennemi portée 3 : ne peut plus attaquer ni lancer de sorts jusqu\'à sa prochaine rotation.'},
+    s2:{name:'',desc:''},
+    u:{name:'Voile des Ténèbres', desc:'Zone d\'ombre 3×3 : ennemis ne peuvent attaquer ni lancer de sorts, déplacement réduit de moitié. 2 rotations.'},
+    stats:{hp:900,atk:180,arm:5,rm:40,spd:5,move:3,atkRange:2} },
 };
 
 const CHAMPION_LIST = ['karek','lysha','sayl','velara','pyrox','gorath','aelys','rohn','vek','zhen'];
@@ -387,6 +392,20 @@ function buildBoard(boardId, state, mode = 'game') {
         cell.style.boxShadow = 'inset 0 0 8px rgba(200,200,0,0.3)';
       }
 
+      // Shadow zone overlay (Zone d'ombre — ennemis ne peuvent attaquer ni lancer de sorts)
+      if (state.shadowZones?.length) {
+        const chebyshevLocal = (r1,c1,r2,c2) => Math.max(Math.abs(r1-r2),Math.abs(c1-c2));
+        const inShadow = state.shadowZones.some(z =>
+          chebyshevLocal(r, c, z.row, z.col) <= z.radius
+        );
+        if (inShadow) {
+          cell.classList.add('cell-shadow-zone');
+          const overlay = document.createElement('div');
+          overlay.className = 'shadow-zone-overlay';
+          cell.appendChild(overlay);
+        }
+      }
+
       // Fountain
       const fountain = getFountainAt(state, r, c);
       if (fountain) {
@@ -417,7 +436,7 @@ function buildBoard(boardId, state, mode = 'game') {
         const fillClass = pct > 60 ? 'full' : pct > 25 ? 'medium' : 'low';
         const isCurrent = state.currentPieceId === piece.id;
         const isActive = S.activePieceId === piece.id;
-        const isShadow = piece.championId === 'sayl_shadow';
+        const isShadow = piece.championId === 'sayl_shadow' || piece.championId === 'sayl_shadow2';
 
         const pieceEl = document.createElement('div');
         pieceEl.className = `piece piece-${piece.team} ${isCurrent&&isMyTurn()?'piece-active':''} ${!piece.alive?'piece-dead':''} ${isShadow?'piece-shadow':''}`;
@@ -1011,7 +1030,8 @@ function showSpellHighlights(piece, spellKey) {
     });
   } else if (spellTargeting === 'single' || spellTargeting === 'dead_ally') {
     const range = getSpellRange(champId, spellKey);
-    const isSummon = (champId === 'sayl' && spellKey === 's1');
+    const isSummon = (champId === 'sayl' && spellKey === 's1') ||
+                     (champId === 'sayl' && spellKey === 'ultim');
     if (isSummon) {
       // Highlight toutes les cases vides à portée
       for (let dr = -range; dr <= range; dr++) {
@@ -1069,26 +1089,33 @@ function showSpellHighlights(piece, spellKey) {
 
 function getSpellTargeting(champId, spellKey) {
   const spellMap = {
-    karek:  {s1:'line', s2:'front_arc', ultim:'self'},
-    lysha:  {s1:'diag_jump', s2:'all_diag', ultim:'adjacent'},
-    sayl:   {s1:'single', s2:'shadow', ultim:'self'},
-    velara: {s1:'line', s2:'aoe_self', ultim:'single_ally'},
-    pyrox:  {s1:'line', s2:'all_diag', ultim:'self'},
-    gorath: {s1:'adjacent', s2:'self', ultim:'self'},
-    aelys:  {s1:'single', s2:'single_ally', ultim:'dead_ally'},
-    rohn:   {s1:'line', s2:'two_diag_place', ultim:'single'},
-    vek:    {s1:'adjacent', s2:'front_arc', ultim:'self'},
-    zhen:   {s1:'line', s2:'diag_jump', ultim:'self'},
+    karek:        {s1:'line',     s2:'aoe_self',    ultim:'aoe_self'},
+    lysha:        {s1:'diag_jump',s2:'all_diag',    ultim:'adjacent'},
+    sayl:         {s1:'single',   s2:'shadow',      ultim:'single'},
+    sayl_shadow2: {s1:'single',   s2:'',            ultim:'aoe_self'},
+    velara:       {s1:'line',     s2:'aoe_self',    ultim:'single_ally'},
+    pyrox:        {s1:'line',     s2:'all_diag',    ultim:'self'},
+    gorath:       {s1:'adjacent', s2:'line',        ultim:'self'},
+    aelys:        {s1:'single',   s2:'single_ally', ultim:'dead_ally'},
+    rohn:         {s1:'line',     s2:'two_diag_place', ultim:'single'},
+    vek:          {s1:'adjacent', s2:'line',        ultim:'self'},
+    zhen:         {s1:'line',     s2:'diag_jump',   ultim:'self'},
   };
   return spellMap[champId]?.[spellKey] || 'single';
 }
 function getSpellRange(champId, spellKey) {
   const rangeMap = {
-    karek:{s1:4,s2:2,ultim:0}, lysha:{s1:3,s2:2,ultim:1},
-    sayl:{s1:2,s2:99,ultim:0}, velara:{s1:4,s2:2,ultim:4},
-    pyrox:{s1:6,s2:4,ultim:3}, gorath:{s1:2,s2:2,ultim:0},
-    aelys:{s1:3,s2:2,ultim:99}, rohn:{s1:7,s2:3,ultim:99},
-    vek:{s1:1,s2:1,ultim:0}, zhen:{s1:5,s2:3,ultim:4},
+    karek:        {s1:4, s2:1,  ultim:2},
+    lysha:        {s1:3, s2:2,  ultim:1},
+    sayl:         {s1:2, s2:99, ultim:3},
+    sayl_shadow2: {s1:3, s2:0,  ultim:1},
+    velara:       {s1:4, s2:2,  ultim:4},
+    pyrox:        {s1:6, s2:4,  ultim:3},
+    gorath:       {s1:1, s2:4,  ultim:0},
+    aelys:        {s1:3, s2:3,  ultim:99},
+    rohn:         {s1:7, s2:3,  ultim:99},
+    vek:          {s1:1, s2:4,  ultim:0},
+    zhen:         {s1:5, s2:3,  ultim:4},
   };
   return rangeMap[champId]?.[spellKey] || 3;
 }
@@ -1510,6 +1537,10 @@ socket.on('rb:state', (state) => {
   if (state.phase === 'playing') {
     if (!el('screen-game').classList.contains('active')) {
       showScreen('screen-game');
+      // Keep-alive : ping HTTP toutes les 8 min pour éviter le sleep de Render
+      if (!window._keepAliveInterval) {
+        window._keepAliveInterval = setInterval(() => fetch('/health').catch(() => {}), 8 * 60 * 1000);
+      }
     }
     renderGame(state);
   }

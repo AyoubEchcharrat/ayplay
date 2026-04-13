@@ -290,6 +290,20 @@ input::placeholder { color:var(--text2); }
 /* ── Traps ─────────────────────────────────────────────────── */
 .trap-obj { width:55%; height:55%; border:1px dashed rgba(0,200,100,0.4); border-radius:3px; opacity:0.6; }
 
+/* ── Shadow Zone (Voile des Ténèbres) ──────────────────────── */
+.cell-shadow-zone { border-color: rgba(100,0,160,0.5) !important; }
+.shadow-zone-overlay {
+  position:absolute; inset:0; pointer-events:none;
+  background: radial-gradient(ellipse at center, rgba(60,0,100,0.45) 0%, rgba(20,0,50,0.30) 100%);
+  border-radius:2px;
+  animation: shadowPulse 2.5s ease-in-out infinite;
+  z-index:1;
+}
+@keyframes shadowPulse {
+  0%,100% { opacity:0.7; }
+  50%      { opacity:1; }
+}
+
 /* ══════════════════════ PIECES ══════════════════════════════ */
 .piece {
   position:absolute; inset:2px;
