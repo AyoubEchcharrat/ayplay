@@ -187,7 +187,7 @@ input::placeholder { color:var(--text2); }
 #screen-game,
 #screen-placement { padding:0; display:none; }
 #screen-game.active,
-#screen-placement.active { display:flex; flex-direction:column; padding:0; overflow:hidden; height:100vh; }
+#screen-placement.active { display:flex; flex-direction:column; padding:0; overflow:hidden; }
 
 /* ── Topbar ────────────────────────────────────────────────── */
 .game-topbar {
@@ -464,16 +464,20 @@ input::placeholder { color:var(--text2); }
 .btn-end-turn:hover { background:rgba(200,155,60,0.18) !important; }
 
 /* ── Pan-zoom board (game screen) ──────────────────────────── */
-#board-wrap-game {
+#board-wrap-game,
+#board-wrap-placement {
   position: relative;
   overflow: hidden;
   cursor: grab;
   padding: 0;
 }
-#board-wrap-game:active { cursor: grabbing; }
+#board-wrap-game:active,
+#board-wrap-placement:active { cursor: grabbing; }
 
 .board-pan-zoom {
   position: absolute;
+  top: 0;
+  left: 0;
   transform-origin: 0 0;
   will-change: transform;
 }
@@ -626,15 +630,18 @@ input::placeholder { color:var(--text2); }
     --cell-size: min(44px, calc(100vw / 13.4));
   }
 
-  .game-body { flex-direction:column; }
+  .game-body { flex-direction:column; overflow:hidden; }
 
   .board-wrap { flex:none; overflow:auto; padding:4px; }
-  #board-wrap-game { flex:1; padding:0; }
+
+  /* Pan-zoom boards fill all vertical space on mobile */
+  #board-wrap-game,
+  #board-wrap-placement { flex:1; padding:0; overflow:hidden; }
 
   .game-sidebar {
     width:100%; flex-direction:row; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden;
     border-left:none; border-top:1px solid rgba(255,255,255,0.07);
-    max-height:22vh; align-items:flex-start;
+    max-height:22vh; align-items:flex-start; flex-shrink:0;
   }
   .sb-section { min-width:180px; max-width:260px; border-bottom:none; border-right:1px solid rgba(255,255,255,0.05); }
   .sb-log { display:none; }

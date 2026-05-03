@@ -46,43 +46,58 @@ const S = {
 
 // ── Board Camera (pan + zoom) ──────────────────────────────────
 const boardCam = { scale: 1, x: 0, y: 0, minScale: 0.3, maxScale: 2.5 };
+const placeCam  = { scale: 1, x: 0, y: 0, minScale: 0.3, maxScale: 2.5 };
 let _panActive = false, _panLastX = 0, _panLastY = 0;
 let _panMoved = false;
 let _pinchLastDist = 0;
+let _activeCam = boardCam;       // which cam is being panned
 let _boardCamReady = false;
+let _placeCamReady = false;
 
 function applyBoardCam() {
   const pz = document.getElementById('board-pan-zoom');
-  if (!pz) return;
-  pz.style.transform = `translate(${boardCam.x}px,${boardCam.y}px) scale(${boardCam.scale})`;
+  if (pz) pz.style.transform = `translate(${boardCam.x}px,${boardCam.y}px) scale(${boardCam.scale})`;
+}
+function applyPlaceCam() {
+  const pz = document.getElementById('board-pan-zoom-placement');
+  if (pz) pz.style.transform = `translate(${placeCam.x}px,${placeCam.y}px) scale(${placeCam.scale})`;
 }
 
-function centerBoardCam() {
-  const wrap = document.getElementById('board-wrap-game');
-  const board = document.getElementById('board-game');
-  if (!wrap || !board || !board.offsetWidth) return;
+function _fitCam(cam, wrapId, boardId, applyFn) {
+  const wrap = document.getElementById(wrapId);
+  const board = document.getElementById(boardId);
+  if (!wrap || !board) return;
   const ww = wrap.clientWidth, wh = wrap.clientHeight;
   const bw = board.offsetWidth, bh = board.offsetHeight;
-  const fitScale = Math.min(1, (ww - 12) / bw, (wh - 12) / bh);
-  boardCam.scale = fitScale;
-  boardCam.x = (ww - bw * fitScale) / 2;
-  boardCam.y = (wh - bh * fitScale) / 2;
-  applyBoardCam();
+  if (ww <= 0 || wh <= 0 || bw <= 0 || bh <= 0) {
+    requestAnimationFrame(() => _fitCam(cam, wrapId, boardId, applyFn));
+    return;
+  }
+  const fitScale = Math.max(cam.minScale, Math.min(1, (ww - 12) / bw, (wh - 12) / bh));
+  cam.scale = fitScale;
+  cam.x = (ww - bw * fitScale) / 2;
+  cam.y = (wh - bh * fitScale) / 2;
+  applyFn();
 }
 
-function zoomBoard(factor) {
-  const wrap = document.getElementById('board-wrap-game');
+function centerBoardCam()  { _fitCam(boardCam, 'board-wrap-game',       'board-game',      applyBoardCam); }
+function centerPlaceCam()  { _fitCam(placeCam,  'board-wrap-placement',  'board-placement', applyPlaceCam); }
+
+function _zoomCam(cam, factor, wrapId, applyFn) {
+  const wrap = document.getElementById(wrapId);
   if (!wrap) return;
   const cx = wrap.clientWidth / 2, cy = wrap.clientHeight / 2;
-  const newScale = Math.max(boardCam.minScale, Math.min(boardCam.maxScale, boardCam.scale * factor));
-  boardCam.x = cx - (cx - boardCam.x) * (newScale / boardCam.scale);
-  boardCam.y = cy - (cy - boardCam.y) * (newScale / boardCam.scale);
-  boardCam.scale = newScale;
-  applyBoardCam();
+  const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, cam.scale * factor));
+  cam.x = cx - (cx - cam.x) * (newScale / cam.scale);
+  cam.y = cy - (cy - cam.y) * (newScale / cam.scale);
+  cam.scale = newScale;
+  applyFn();
 }
+function zoomBoard(factor) { _zoomCam(boardCam, factor, 'board-wrap-game',      applyBoardCam); }
+function zoomPlace(factor) { _zoomCam(placeCam,  factor, 'board-wrap-placement', applyPlaceCam); }
 
-function initBoardCamera() {
-  const wrap = document.getElementById('board-wrap-game');
+function _attachPanZoom(wrapId, cam, applyFn, zoomInId, zoomOutId, zoomResetId, centerFn) {
+  const wrap = document.getElementById(wrapId);
   if (!wrap || wrap._camInited) return;
   wrap._camInited = true;
 
@@ -91,34 +106,25 @@ function initBoardCamera() {
     const rect = wrap.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-    const newScale = Math.max(boardCam.minScale, Math.min(boardCam.maxScale, boardCam.scale * factor));
-    boardCam.x = mx - (mx - boardCam.x) * (newScale / boardCam.scale);
-    boardCam.y = my - (my - boardCam.y) * (newScale / boardCam.scale);
-    boardCam.scale = newScale;
-    applyBoardCam();
+    const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, cam.scale * factor));
+    cam.x = mx - (mx - cam.x) * (newScale / cam.scale);
+    cam.y = my - (my - cam.y) * (newScale / cam.scale);
+    cam.scale = newScale;
+    applyFn();
   }, { passive: false });
 
   wrap.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
     _panActive = true;
+    _activeCam = cam;
     _panMoved = false;
     _panLastX = e.clientX;
     _panLastY = e.clientY;
   });
-  window.addEventListener('mousemove', e => {
-    if (!_panActive) return;
-    const dx = e.clientX - _panLastX, dy = e.clientY - _panLastY;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) _panMoved = true;
-    boardCam.x += dx;
-    boardCam.y += dy;
-    _panLastX = e.clientX;
-    _panLastY = e.clientY;
-    applyBoardCam();
-  });
-  window.addEventListener('mouseup', () => { _panActive = false; });
 
   wrap.addEventListener('touchstart', e => {
     _panMoved = false;
+    _activeCam = cam;
     if (e.touches.length === 1) {
       _panLastX = e.touches[0].clientX;
       _panLastY = e.touches[0].clientY;
@@ -135,9 +141,9 @@ function initBoardCamera() {
     if (e.touches.length === 1) {
       const dx = e.touches[0].clientX - _panLastX, dy = e.touches[0].clientY - _panLastY;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) _panMoved = true;
-      boardCam.x += dx; boardCam.y += dy;
+      cam.x += dx; cam.y += dy;
       _panLastX = e.touches[0].clientX; _panLastY = e.touches[0].clientY;
-      applyBoardCam();
+      applyFn();
     } else if (e.touches.length === 2) {
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
@@ -148,23 +154,39 @@ function initBoardCamera() {
         const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
         const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
         const ratio = dist / _pinchLastDist;
-        const newScale = Math.max(boardCam.minScale, Math.min(boardCam.maxScale, boardCam.scale * ratio));
-        boardCam.x = midX - (midX - boardCam.x) * (newScale / boardCam.scale);
-        boardCam.y = midY - (midY - boardCam.y) * (newScale / boardCam.scale);
-        boardCam.scale = newScale;
-        applyBoardCam();
+        const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, cam.scale * ratio));
+        cam.x = midX - (midX - cam.x) * (newScale / cam.scale);
+        cam.y = midY - (midY - cam.y) * (newScale / cam.scale);
+        cam.scale = newScale;
+        applyFn();
       }
       _pinchLastDist = dist;
       _panMoved = true;
     }
   }, { passive: false });
 
-  document.getElementById('btn-zoom-in')?.addEventListener('click', e => { e.stopPropagation(); zoomBoard(1.25); });
-  document.getElementById('btn-zoom-out')?.addEventListener('click', e => { e.stopPropagation(); zoomBoard(1 / 1.25); });
-  document.getElementById('btn-zoom-reset')?.addEventListener('click', e => { e.stopPropagation(); centerBoardCam(); });
+  document.getElementById(zoomInId)?.addEventListener('click',    e => { e.stopPropagation(); _zoomCam(cam, 1.25,        wrapId, applyFn); });
+  document.getElementById(zoomOutId)?.addEventListener('click',   e => { e.stopPropagation(); _zoomCam(cam, 1 / 1.25,   wrapId, applyFn); });
+  document.getElementById(zoomResetId)?.addEventListener('click', e => { e.stopPropagation(); centerFn(); });
+}
+
+function initBoardCamera() {
+  _attachPanZoom('board-wrap-game',      boardCam, applyBoardCam, 'btn-zoom-in',   'btn-zoom-out',   'btn-zoom-reset',   centerBoardCam);
+  _attachPanZoom('board-wrap-placement', placeCam,  applyPlaceCam, 'btn-zoom-in-p', 'btn-zoom-out-p', 'btn-zoom-reset-p', centerPlaceCam);
+
+  window.addEventListener('mousemove', e => {
+    if (!_panActive) return;
+    const dx = e.clientX - _panLastX, dy = e.clientY - _panLastY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) _panMoved = true;
+    _activeCam.x += dx; _activeCam.y += dy;
+    _panLastX = e.clientX; _panLastY = e.clientY;
+    _activeCam === boardCam ? applyBoardCam() : applyPlaceCam();
+  });
+  window.addEventListener('mouseup', () => { _panActive = false; });
 
   window.addEventListener('resize', () => {
-    if (document.getElementById('screen-game').classList.contains('active')) centerBoardCam();
+    if (document.getElementById('screen-game').classList.contains('active'))      centerBoardCam();
+    if (document.getElementById('screen-placement').classList.contains('active')) centerPlaceCam();
   });
 }
 
@@ -282,7 +304,8 @@ function showScreen(id) {
   el(id).classList.add('active');
   const hub = el('hub-btn');
   if (hub) hub.style.display = (id === 'screen-lobby') ? '' : 'none';
-  if (id === 'screen-game') _boardCamReady = false;
+  if (id === 'screen-game')      _boardCamReady = false;
+  if (id === 'screen-placement') _placeCamReady = false;
 }
 
 function chebyshev(r1,c1,r2,c2) { return Math.max(Math.abs(r1-r2), Math.abs(c1-c2)); }
@@ -1262,6 +1285,7 @@ function renderGame(state) {
     buildBoard('board-placement', state, 'placement');
     renderPlacementQueue(state);
     renderPlacementScreen(state);
+    if (!_placeCamReady) { _placeCamReady = true; centerPlaceCam(); }
     return;
   }
 

@@ -93,8 +93,15 @@
     </div>
   </div>
   <div class="game-body">
-    <div class="board-wrap">
-      <div class="board" id="board-placement"></div>
+    <div class="board-wrap" id="board-wrap-placement">
+      <div id="board-pan-zoom-placement" class="board-pan-zoom">
+        <div class="board" id="board-placement"></div>
+      </div>
+      <div class="board-zoom-controls">
+        <button class="zoom-btn" id="btn-zoom-in-p" title="Zoom +">+</button>
+        <button class="zoom-btn" id="btn-zoom-reset-p" title="Recentrer">⊙</button>
+        <button class="zoom-btn" id="btn-zoom-out-p" title="Zoom −">−</button>
+      </div>
     </div>
     <aside class="game-sidebar">
       <div class="sb-section">
