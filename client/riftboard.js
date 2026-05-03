@@ -44,6 +44,130 @@ const S = {
   hoveredPiece: null,
 };
 
+// ── Board Camera (pan + zoom) ──────────────────────────────────
+const boardCam = { scale: 1, x: 0, y: 0, minScale: 0.3, maxScale: 2.5 };
+let _panActive = false, _panLastX = 0, _panLastY = 0;
+let _panMoved = false;
+let _pinchLastDist = 0;
+let _boardCamReady = false;
+
+function applyBoardCam() {
+  const pz = document.getElementById('board-pan-zoom');
+  if (!pz) return;
+  pz.style.transform = `translate(${boardCam.x}px,${boardCam.y}px) scale(${boardCam.scale})`;
+}
+
+function centerBoardCam() {
+  const wrap = document.getElementById('board-wrap-game');
+  const board = document.getElementById('board-game');
+  if (!wrap || !board || !board.offsetWidth) return;
+  const ww = wrap.clientWidth, wh = wrap.clientHeight;
+  const bw = board.offsetWidth, bh = board.offsetHeight;
+  const fitScale = Math.min(1, (ww - 12) / bw, (wh - 12) / bh);
+  boardCam.scale = fitScale;
+  boardCam.x = (ww - bw * fitScale) / 2;
+  boardCam.y = (wh - bh * fitScale) / 2;
+  applyBoardCam();
+}
+
+function zoomBoard(factor) {
+  const wrap = document.getElementById('board-wrap-game');
+  if (!wrap) return;
+  const cx = wrap.clientWidth / 2, cy = wrap.clientHeight / 2;
+  const newScale = Math.max(boardCam.minScale, Math.min(boardCam.maxScale, boardCam.scale * factor));
+  boardCam.x = cx - (cx - boardCam.x) * (newScale / boardCam.scale);
+  boardCam.y = cy - (cy - boardCam.y) * (newScale / boardCam.scale);
+  boardCam.scale = newScale;
+  applyBoardCam();
+}
+
+function initBoardCamera() {
+  const wrap = document.getElementById('board-wrap-game');
+  if (!wrap || wrap._camInited) return;
+  wrap._camInited = true;
+
+  wrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = wrap.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    const newScale = Math.max(boardCam.minScale, Math.min(boardCam.maxScale, boardCam.scale * factor));
+    boardCam.x = mx - (mx - boardCam.x) * (newScale / boardCam.scale);
+    boardCam.y = my - (my - boardCam.y) * (newScale / boardCam.scale);
+    boardCam.scale = newScale;
+    applyBoardCam();
+  }, { passive: false });
+
+  wrap.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    _panActive = true;
+    _panMoved = false;
+    _panLastX = e.clientX;
+    _panLastY = e.clientY;
+  });
+  window.addEventListener('mousemove', e => {
+    if (!_panActive) return;
+    const dx = e.clientX - _panLastX, dy = e.clientY - _panLastY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) _panMoved = true;
+    boardCam.x += dx;
+    boardCam.y += dy;
+    _panLastX = e.clientX;
+    _panLastY = e.clientY;
+    applyBoardCam();
+  });
+  window.addEventListener('mouseup', () => { _panActive = false; });
+
+  wrap.addEventListener('touchstart', e => {
+    _panMoved = false;
+    if (e.touches.length === 1) {
+      _panLastX = e.touches[0].clientX;
+      _panLastY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      _pinchLastDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+    }
+  }, { passive: true });
+
+  wrap.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      const dx = e.touches[0].clientX - _panLastX, dy = e.touches[0].clientY - _panLastY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) _panMoved = true;
+      boardCam.x += dx; boardCam.y += dy;
+      _panLastX = e.touches[0].clientX; _panLastY = e.touches[0].clientY;
+      applyBoardCam();
+    } else if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      if (_pinchLastDist > 0) {
+        const rect = wrap.getBoundingClientRect();
+        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+        const ratio = dist / _pinchLastDist;
+        const newScale = Math.max(boardCam.minScale, Math.min(boardCam.maxScale, boardCam.scale * ratio));
+        boardCam.x = midX - (midX - boardCam.x) * (newScale / boardCam.scale);
+        boardCam.y = midY - (midY - boardCam.y) * (newScale / boardCam.scale);
+        boardCam.scale = newScale;
+        applyBoardCam();
+      }
+      _pinchLastDist = dist;
+      _panMoved = true;
+    }
+  }, { passive: false });
+
+  document.getElementById('btn-zoom-in')?.addEventListener('click', e => { e.stopPropagation(); zoomBoard(1.25); });
+  document.getElementById('btn-zoom-out')?.addEventListener('click', e => { e.stopPropagation(); zoomBoard(1 / 1.25); });
+  document.getElementById('btn-zoom-reset')?.addEventListener('click', e => { e.stopPropagation(); centerBoardCam(); });
+
+  window.addEventListener('resize', () => {
+    if (document.getElementById('screen-game').classList.contains('active')) centerBoardCam();
+  });
+}
+
 // Champion definitions (mirrored from server for display)
 const CHAMPIONS = {
   karek:  { name:'Gavik',  title:'Le Brise-Ligne',         class:'Tank-Guerrier', element:'terre',   emoji:'🪨', spd:3,
@@ -158,6 +282,7 @@ function showScreen(id) {
   el(id).classList.add('active');
   const hub = el('hub-btn');
   if (hub) hub.style.display = (id === 'screen-lobby') ? '' : 'none';
+  if (id === 'screen-game') _boardCamReady = false;
 }
 
 function chebyshev(r1,c1,r2,c2) { return Math.max(Math.abs(r1-r2), Math.abs(c1-c2)); }
@@ -584,6 +709,7 @@ function onPieceClick(piece, cellEl, r, c, mode) {
 }
 
 function onCellClick(r, c, mode) {
+  if (_panMoved) { _panMoved = false; return; }
   if (mode === 'placement') {
     if (!S.placingChampionId) return;
     if (!S.gameState) return;
@@ -866,6 +992,7 @@ function setupActionButtons() {
   };
 }
 setupActionButtons();
+initBoardCamera();
 
 function isAnchorOrStunned(piece) {
   return piece.isAnchor || isStunned(piece);
@@ -1147,6 +1274,10 @@ function renderGame(state) {
   }
 
   buildBoard('board-game', state, 'game');
+  if (!_boardCamReady) {
+    _boardCamReady = true;
+    centerBoardCam();
+  }
 
   // Animer les pièces déplacées + ghost sur ancienne position
   state.pieces.forEach(p => {
@@ -1192,6 +1323,12 @@ function renderGame(state) {
     el('game-phase-label').style.color = 'var(--gold)';
   } else {
     el('active-piece-panel').style.display = 'none';
+    // Grey out action bar buttons during opponent's turn
+    ['act-move','act-attack','act-s1','act-s2','act-ultim'].forEach(id => {
+      const b = el(id); if (b) { b.classList.remove('active'); b.classList.add('done'); }
+    });
+    const endBtn = el('act-end');
+    if (endBtn) { endBtn.classList.remove('active'); endBtn.classList.add('done'); }
     el('game-phase-label').textContent = `Tour adverse — ${CHAMPIONS[cp?.championId]?.name || ''}`;
     el('game-phase-label').style.color = 'var(--text2)';
   }

@@ -119,23 +119,22 @@
   </div>
 
   <div class="game-body">
-    <div class="board-wrap">
-      <div class="board" id="board-game"></div>
+    <div class="board-wrap" id="board-wrap-game">
+      <div id="board-pan-zoom" class="board-pan-zoom">
+        <div class="board" id="board-game"></div>
+      </div>
+      <div class="board-zoom-controls">
+        <button class="zoom-btn" id="btn-zoom-in" title="Zoom +">+</button>
+        <button class="zoom-btn" id="btn-zoom-reset" title="Recentrer">⊙</button>
+        <button class="zoom-btn" id="btn-zoom-out" title="Zoom −">−</button>
+      </div>
     </div>
 
     <aside class="game-sidebar">
-      <!-- Active piece -->
+      <!-- Active piece info only (buttons moved to action bar below) -->
       <div class="sb-section" id="active-piece-panel" style="display:none">
         <div class="sb-title">Champion actif</div>
         <div id="active-piece-info"></div>
-        <div class="action-buttons" id="action-buttons">
-          <button class="act-btn" id="act-move">🚶 Déplacer</button>
-          <button class="act-btn" id="act-attack">⚔️ Attaquer</button>
-          <button class="act-btn act-spell-btn" id="act-s1">Sort 1</button>
-          <button class="act-btn act-spell-btn" id="act-s2">Sort 2</button>
-          <button class="act-btn act-spell-btn" id="act-ultim">✨ Ultim</button>
-          <button class="act-btn btn-end-turn" id="act-end">Fin de tour →</button>
-        </div>
       </div>
 
       <!-- Hovered piece info -->
@@ -150,6 +149,18 @@
         <div id="game-log" class="game-log"></div>
       </div>
     </aside>
+  </div>
+
+  <!-- Action bar — always pinned at the bottom of the game screen -->
+  <div class="game-action-bar">
+    <div class="action-buttons" id="action-buttons">
+      <button class="act-btn" id="act-move">🚶 Déplacer</button>
+      <button class="act-btn" id="act-attack">⚔️ Attaquer</button>
+      <button class="act-btn act-spell-btn" id="act-s1">Sort 1</button>
+      <button class="act-btn act-spell-btn" id="act-s2">Sort 2</button>
+      <button class="act-btn act-spell-btn" id="act-ultim">✨ Ultim</button>
+      <button class="act-btn btn-end-turn" id="act-end">Fin de tour →</button>
+    </div>
   </div>
 </div>
 
