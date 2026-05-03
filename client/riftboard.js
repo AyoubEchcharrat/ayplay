@@ -45,12 +45,15 @@ const S = {
 };
 
 // ── Board Camera (pan + zoom) ──────────────────────────────────
+// #board-pan-zoom is a normal flex child (not absolute).
+// Flexbox centers it by default — JS applies transform on top for pan/zoom.
+// With transform-origin:0 0, zoom math uses coords adjusted by flex origin.
 const boardCam = { scale: 1, x: 0, y: 0, minScale: 0.3, maxScale: 2.5 };
 const placeCam  = { scale: 1, x: 0, y: 0, minScale: 0.3, maxScale: 2.5 };
 let _panActive = false, _panLastX = 0, _panLastY = 0;
 let _panMoved = false;
 let _pinchLastDist = 0;
-let _activeCam = boardCam;       // which cam is being panned
+let _activeCam = boardCam;
 let _boardCamReady = false;
 let _placeCamReady = false;
 
@@ -63,8 +66,20 @@ function applyPlaceCam() {
   if (pz) pz.style.transform = `translate(${placeCam.x}px,${placeCam.y}px) scale(${placeCam.scale})`;
 }
 
+// Flex origin: where the board element's top-left sits in the wrap before any transform.
+// Because flex centers it: flex_ox = (ww - bw) / 2.
+// Zoom must use adjusted coords: adj = cursor - flex_origin.
+function _adjCoords(wrapId, boardId, mx, my) {
+  const wrap  = document.getElementById(wrapId);
+  const board = document.getElementById(boardId);
+  if (!wrap || !board || !board.offsetWidth) return { adj_mx: mx, adj_my: my, bw: 0, bh: 0 };
+  const ww = wrap.clientWidth, wh = wrap.clientHeight;
+  const bw = board.offsetWidth, bh = board.offsetHeight;
+  return { adj_mx: mx - (ww - bw) / 2, adj_my: my - (wh - bh) / 2, bw, bh, ww, wh };
+}
+
 function _fitCam(cam, wrapId, boardId, applyFn) {
-  const wrap = document.getElementById(wrapId);
+  const wrap  = document.getElementById(wrapId);
   const board = document.getElementById(boardId);
   if (!wrap || !board) return;
   const ww = wrap.clientWidth, wh = wrap.clientHeight;
@@ -75,28 +90,35 @@ function _fitCam(cam, wrapId, boardId, applyFn) {
   }
   const fitScale = Math.max(cam.minScale, Math.min(1, (ww - 12) / bw, (wh - 12) / bh));
   cam.scale = fitScale;
-  cam.x = (ww - bw * fitScale) / 2;
-  cam.y = (wh - bh * fitScale) / 2;
+  // When scale < 1, translate to keep board visually centered:
+  // board visual center = flex_origin + cam.x + bw*s/2 = ww/2
+  // cam.x = bw/2 - bw*s/2 = bw/2 * (1 - s)
+  cam.x = bw / 2 * (1 - fitScale);
+  cam.y = bh / 2 * (1 - fitScale);
   applyFn();
 }
 
-function centerBoardCam()  { _fitCam(boardCam, 'board-wrap-game',       'board-game',      applyBoardCam); }
-function centerPlaceCam()  { _fitCam(placeCam,  'board-wrap-placement',  'board-placement', applyPlaceCam); }
+function centerBoardCam() { _fitCam(boardCam, 'board-wrap-game',      'board-game',      applyBoardCam); }
+function centerPlaceCam()  { _fitCam(placeCam, 'board-wrap-placement', 'board-placement', applyPlaceCam); }
 
-function _zoomCam(cam, factor, wrapId, applyFn) {
-  const wrap = document.getElementById(wrapId);
-  if (!wrap) return;
-  const cx = wrap.clientWidth / 2, cy = wrap.clientHeight / 2;
-  const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, cam.scale * factor));
-  cam.x = cx - (cx - cam.x) * (newScale / cam.scale);
-  cam.y = cy - (cy - cam.y) * (newScale / cam.scale);
+function _zoomAt(cam, newScale, adj_mx, adj_my, applyFn) {
+  cam.x = adj_mx - (adj_mx - cam.x) * (newScale / cam.scale);
+  cam.y = adj_my - (adj_my - cam.y) * (newScale / cam.scale);
   cam.scale = newScale;
   applyFn();
 }
-function zoomBoard(factor) { _zoomCam(boardCam, factor, 'board-wrap-game',      applyBoardCam); }
-function zoomPlace(factor) { _zoomCam(placeCam,  factor, 'board-wrap-placement', applyPlaceCam); }
 
-function _attachPanZoom(wrapId, cam, applyFn, zoomInId, zoomOutId, zoomResetId, centerFn) {
+function _zoomCam(cam, factor, wrapId, boardId, applyFn) {
+  const d = _adjCoords(wrapId, boardId, 0, 0);
+  // Zoom toward board center: adj center = bw/2, bh/2
+  const cx = d.bw / 2, cy = d.bh / 2;
+  const ns = Math.max(cam.minScale, Math.min(cam.maxScale, cam.scale * factor));
+  _zoomAt(cam, ns, cx, cy, applyFn);
+}
+function zoomBoard(factor) { _zoomCam(boardCam, factor, 'board-wrap-game',      'board-game',      applyBoardCam); }
+function zoomPlace(factor) { _zoomCam(placeCam, factor, 'board-wrap-placement', 'board-placement', applyPlaceCam); }
+
+function _attachPanZoom(wrapId, boardId, cam, applyFn, zoomInId, zoomOutId, zoomResetId, centerFn) {
   const wrap = document.getElementById(wrapId);
   if (!wrap || wrap._camInited) return;
   wrap._camInited = true;
@@ -105,29 +127,21 @@ function _attachPanZoom(wrapId, cam, applyFn, zoomInId, zoomOutId, zoomResetId, 
     e.preventDefault();
     const rect = wrap.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-    const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, cam.scale * factor));
-    cam.x = mx - (mx - cam.x) * (newScale / cam.scale);
-    cam.y = my - (my - cam.y) * (newScale / cam.scale);
-    cam.scale = newScale;
-    applyFn();
+    const d = _adjCoords(wrapId, boardId, mx, my);
+    const ns = Math.max(cam.minScale, Math.min(cam.maxScale, cam.scale * (e.deltaY < 0 ? 1.12 : 1/1.12)));
+    _zoomAt(cam, ns, d.adj_mx, d.adj_my, applyFn);
   }, { passive: false });
 
   wrap.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
-    _panActive = true;
-    _activeCam = cam;
-    _panMoved = false;
-    _panLastX = e.clientX;
-    _panLastY = e.clientY;
+    _panActive = true; _activeCam = cam; _panMoved = false;
+    _panLastX = e.clientX; _panLastY = e.clientY;
   });
 
   wrap.addEventListener('touchstart', e => {
-    _panMoved = false;
-    _activeCam = cam;
+    _panMoved = false; _activeCam = cam;
     if (e.touches.length === 1) {
-      _panLastX = e.touches[0].clientX;
-      _panLastY = e.touches[0].clientY;
+      _panLastX = e.touches[0].clientX; _panLastY = e.touches[0].clientY;
     } else if (e.touches.length === 2) {
       _pinchLastDist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
@@ -153,26 +167,22 @@ function _attachPanZoom(wrapId, cam, applyFn, zoomInId, zoomOutId, zoomResetId, 
         const rect = wrap.getBoundingClientRect();
         const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
         const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
-        const ratio = dist / _pinchLastDist;
-        const newScale = Math.max(cam.minScale, Math.min(cam.maxScale, cam.scale * ratio));
-        cam.x = midX - (midX - cam.x) * (newScale / cam.scale);
-        cam.y = midY - (midY - cam.y) * (newScale / cam.scale);
-        cam.scale = newScale;
-        applyFn();
+        const d = _adjCoords(wrapId, boardId, midX, midY);
+        const ns = Math.max(cam.minScale, Math.min(cam.maxScale, cam.scale * (dist / _pinchLastDist)));
+        _zoomAt(cam, ns, d.adj_mx, d.adj_my, applyFn);
       }
-      _pinchLastDist = dist;
-      _panMoved = true;
+      _pinchLastDist = dist; _panMoved = true;
     }
   }, { passive: false });
 
-  document.getElementById(zoomInId)?.addEventListener('click',    e => { e.stopPropagation(); _zoomCam(cam, 1.25,        wrapId, applyFn); });
-  document.getElementById(zoomOutId)?.addEventListener('click',   e => { e.stopPropagation(); _zoomCam(cam, 1 / 1.25,   wrapId, applyFn); });
+  document.getElementById(zoomInId)?.addEventListener('click',    e => { e.stopPropagation(); _zoomCam(cam, 1.25,      wrapId, boardId, applyFn); });
+  document.getElementById(zoomOutId)?.addEventListener('click',   e => { e.stopPropagation(); _zoomCam(cam, 1/1.25,    wrapId, boardId, applyFn); });
   document.getElementById(zoomResetId)?.addEventListener('click', e => { e.stopPropagation(); centerFn(); });
 }
 
 function initBoardCamera() {
-  _attachPanZoom('board-wrap-game',      boardCam, applyBoardCam, 'btn-zoom-in',   'btn-zoom-out',   'btn-zoom-reset',   centerBoardCam);
-  _attachPanZoom('board-wrap-placement', placeCam,  applyPlaceCam, 'btn-zoom-in-p', 'btn-zoom-out-p', 'btn-zoom-reset-p', centerPlaceCam);
+  _attachPanZoom('board-wrap-game',      'board-game',      boardCam, applyBoardCam, 'btn-zoom-in',   'btn-zoom-out',   'btn-zoom-reset',   centerBoardCam);
+  _attachPanZoom('board-wrap-placement', 'board-placement', placeCam, applyPlaceCam, 'btn-zoom-in-p', 'btn-zoom-out-p', 'btn-zoom-reset-p', centerPlaceCam);
 
   window.addEventListener('mousemove', e => {
     if (!_panActive) return;
