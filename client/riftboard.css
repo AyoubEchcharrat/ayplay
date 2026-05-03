@@ -187,7 +187,7 @@ input::placeholder { color:var(--text2); }
 #screen-game,
 #screen-placement { padding:0; display:none; }
 #screen-game.active,
-#screen-placement.active { display:flex; flex-direction:column; padding:0; overflow:hidden; }
+#screen-placement.active { display:flex; flex-direction:column; padding:0; overflow:hidden; align-items:stretch; justify-content:flex-start; }
 
 /* ── Topbar ────────────────────────────────────────────────── */
 .game-topbar {
@@ -655,6 +655,32 @@ input::placeholder { color:var(--text2); }
   }
   .game-action-bar .btn-end-turn { flex: unset; grid-column: 1/-1; }
   .game-action-bar .act-btn { max-height: none; flex: unset; white-space: normal; }
+
+  /* Placement screen: sidebar becomes a vertical scrollable list */
+  #screen-placement.active .game-sidebar {
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 32vh;
+    width: 100%;
+    flex-shrink: 0;
+  }
+  #screen-placement.active .sb-section {
+    min-width: 100%;
+    max-width: 100%;
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    overflow: visible;
+  }
+  #screen-placement.active .placement-queue {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  #screen-placement.active .pq-item {
+    flex: 1 0 calc(50% - 3px);
+    min-width: 100px;
+  }
 
   .phase-label { max-width:100px; font-size:0.72rem; }
   .turn-order-bar { max-width:120px; }
